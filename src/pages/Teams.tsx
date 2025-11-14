@@ -256,6 +256,7 @@ const JokerTeamHub: React.FC<{ team: Team, allUsers: User[], onClose: () => void
     const [editingFacilitatorId, setEditingFacilitatorId] = useState<string | null>(null);
     const [isAdding, setIsAdding] = useState(false);
     const [formState, setFormState] = useState<Partial<Facilitator>>({});
+    const [activeTab, setActiveTab] = useState<'governors' | 'facilitators'>('governors');
     
     useEffect(() => {
       setLocalTeam(team);
@@ -355,6 +356,32 @@ const JokerTeamHub: React.FC<{ team: Team, allUsers: User[], onClose: () => void
     );
 
     const teamStyle = getTeamStyles(team.id);
+    const governors = localTeam.facilitators?.filter(f => f.position === 'Governor') || [];
+    const otherFacilitators = localTeam.facilitators?.filter(f => f.position !== 'Governor') || [];
+
+    const renderFacilitatorCard = (f: Facilitator) => {
+        const facilitatorUser = allUsers.find(u => u.id === f.userId);
+        return (
+            <Card key={f.userId} className="p-4">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-100">{facilitatorUser?.name || 'Unknown User'}</h4>
+                        <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                            {f.position === 'Governor' && <i className="bi bi-star-fill text-yellow-500"></i>}
+                            {f.position}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{f.roleDescription}</p>
+                    </div>
+                    {isAdmin && (
+                        <div className="flex gap-2 flex-shrink-0 ml-4">
+                            <Button variant="secondary" className="!p-2 h-8 w-8 text-xs" onClick={() => handleStartEdit(f)}><i className="bi bi-pencil-fill"></i></Button>
+                            <Button variant="danger" className="!p-2 h-8 w-8 text-xs" onClick={() => handleDelete(f.userId)} disabled={f.position === 'Governor'}><i className="bi bi-trash-fill"></i></Button>
+                        </div>
+                    )}
+                </div>
+            </Card>
+        );
+    };
 
     return (
         <>
@@ -365,74 +392,148 @@ const JokerTeamHub: React.FC<{ team: Team, allUsers: User[], onClose: () => void
                     <span style={{ color: teamStyle.gradient.from }} className="truncate">{team.name}</span>
                 </h2>
             </div>
-            <div className="flex-grow overflow-y-auto p-6 space-y-4">
-                <div className="flex justify-between items-center">
-                    <h3 className="font-bold text-lg">Facilitator Management</h3>
-                    {isAdmin && !isAdding && !editingFacilitatorId && (
-                        <Button onClick={handleStartAdd} className="text-xs py-1 px-3">
-                            <i className="bi bi-plus-lg mr-1"></i> Add Member
-                        </Button>
-                    )}
+            <div className="flex-shrink-0 overflow-x-auto border-b border-slate-200 dark:border-slate-700 px-4 pt-2">
+                <div className="flex space-x-2">
+                    <TabButton 
+                        label={<span className="flex items-center gap-1"><i className="bi bi-star-fill"></i>Governors {governors.length > 0 && <span className="ml-1 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-full">{governors.length}</span>}</span>} 
+                        isActive={activeTab === 'governors'} 
+                        onClick={() => setActiveTab('governors')} 
+                    />
+                    <TabButton 
+                        label={<span className="flex items-center gap-1">Facilitators {otherFacilitators.length > 0 && <span className="ml-1 bg-indigo-500 text-white text-xs px-2 py-0.5 rounded-full">{otherFacilitators.length}</span>}</span>} 
+                        isActive={activeTab === 'facilitators'} 
+                        onClick={() => setActiveTab('facilitators')} 
+                    />
                 </div>
-                
-                {(isAdding || editingFacilitatorId) && (
-                    <Card className="p-4 bg-slate-50 dark:bg-slate-900/50">
-                        <h4 className="font-bold mb-3">{isAdding ? 'Add New Facilitator' : 'Edit Facilitator'}</h4>
-                        <div className="space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">User</label>
-                                    {isAdding ? (
-                                        <select name="userId" value={formState.userId || ''} onChange={handleFormChange} className="w-full text-sm p-2 bg-white dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 rounded-lg">
-                                            <option value="">Select a user</option>
-                                            {allUsers.filter(u => u.teamId !== AMARANTH_JOKERS_TEAM_ID).map(u => (
-                                                <option key={u.id} value={u.id}>{u.name}</option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <Input label="" id="name" name="name" value={allUsers.find(u => u.id === formState.userId)?.name || ''} disabled />
-                                    )}
-                                </div>
-                                <Input label="Position" id="position" name="position" value={formState.position || ''} onChange={handleFormChange} disabled={formState.position === 'Governor'}/>
-                            </div>
+            </div>
+            <div className="flex-grow overflow-y-auto p-6 space-y-4">
+                {activeTab === 'governors' && (
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Role Description</label>
-                                <textarea name="roleDescription" value={formState.roleDescription || ''} onChange={handleFormChange} rows={2} className="w-full text-sm px-3 py-2 bg-white dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20" />
+                                <h3 className="font-bold text-lg flex items-center gap-2">
+                                    <i className="bi bi-star-fill text-yellow-500"></i>
+                                    Governors Management
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Governors have full permissions and cannot be deleted</p>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Permissions</label>
-                                {renderPermissionChecklist(formState.permissions || {}, formState.position === 'Governor')}
-                            </div>
+                            {isAdmin && !isAdding && !editingFacilitatorId && governors.length < 5 && (
+                                <Button onClick={handleStartAdd} className="text-xs py-1 px-3">
+                                    <i className="bi bi-plus-lg mr-1"></i> Add Governor
+                                </Button>
+                            )}
                         </div>
-                        <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
-                            <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
-                            <Button onClick={handleSave}>Save</Button>
-                        </div>
-                    </Card>
-                )}
-
-                <div className="space-y-3">
-                    {localTeam.facilitators?.map(f => {
-                        const facilitatorUser = allUsers.find(u => u.id === f.userId);
-                        return (
-                            <Card key={f.userId} className="p-4">
-                                <div className="flex justify-between items-start">
+                        
+                        {(isAdding || editingFacilitatorId) && formState.position === 'Governor' && (
+                            <Card className="p-4 bg-yellow-50 dark:bg-yellow-900/20 mb-4">
+                                <h4 className="font-bold mb-3 text-yellow-900 dark:text-yellow-100">{isAdding ? 'Add New Governor' : 'Edit Governor'}</h4>
+                                <div className="space-y-3">
                                     <div>
-                                        <h4 className="font-bold text-slate-800 dark:text-slate-100">{facilitatorUser?.name || 'Unknown User'}</h4>
-                                        <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{f.position}</p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{f.roleDescription}</p>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">User</label>
+                                        {isAdding ? (
+                                            <select name="userId" value={formState.userId || ''} onChange={handleFormChange} className="w-full text-sm p-2 bg-white dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 rounded-lg">
+                                                <option value="">Select a user</option>
+                                                {allUsers.filter(u => u.teamId !== AMARANTH_JOKERS_TEAM_ID && !governors.find(g => g.userId === u.id)).map(u => (
+                                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <Input label="" id="name" name="name" value={allUsers.find(u => u.id === formState.userId)?.name || ''} disabled />
+                                        )}
                                     </div>
-                                    {isAdmin && (
-                                        <div className="flex gap-2 flex-shrink-0 ml-4">
-                                            <Button variant="secondary" className="!p-2 h-8 w-8 text-xs" onClick={() => handleStartEdit(f)}><i className="bi bi-pencil-fill"></i></Button>
-                                            <Button variant="danger" className="!p-2 h-8 w-8 text-xs" onClick={() => handleDelete(f.userId)} disabled={f.position === 'Governor'}><i className="bi bi-trash-fill"></i></Button>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Role Description</label>
+                                        <textarea name="roleDescription" value={formState.roleDescription || ''} onChange={handleFormChange} rows={2} className="w-full text-sm px-3 py-2 bg-white dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 rounded-lg focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500/20" />
+                                    </div>
+                                    <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg text-sm">
+                                        <p className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Permissions (Auto-set for Governors):</p>
+                                        <div className="space-y-1 text-slate-600 dark:text-slate-400 text-xs">
+                                            <p><i className="bi bi-check-circle-fill text-green-500 mr-2"></i>Can Add Members</p>
+                                            <p><i className="bi bi-check-circle-fill text-green-500 mr-2"></i>Can Delete Members</p>
+                                            <p><i className="bi bi-check-circle-fill text-green-500 mr-2"></i>Can Update Information</p>
+                                            <p><i className="bi bi-check-circle-fill text-green-500 mr-2"></i>Can Pass Scores</p>
                                         </div>
-                                    )}
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+                                    <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
+                                    <Button onClick={handleSave}>Save Governor</Button>
                                 </div>
                             </Card>
-                        );
-                    })}
-                </div>
+                        )}
+
+                        {governors.length > 0 ? (
+                            <div className="space-y-3">
+                                {governors.map(renderFacilitatorCard)}
+                            </div>
+                        ) : (
+                            <Card className="p-6 text-center bg-slate-50 dark:bg-slate-900/30">
+                                <i className="bi bi-star text-4xl text-slate-300 dark:text-slate-600 mb-2"></i>
+                                <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">No governors assigned yet</p>
+                            </Card>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'facilitators' && (
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-lg">Facilitator Management</h3>
+                            {isAdmin && !isAdding && !editingFacilitatorId && (
+                                <Button onClick={handleStartAdd} className="text-xs py-1 px-3">
+                                    <i className="bi bi-plus-lg mr-1"></i> Add Facilitator
+                                </Button>
+                            )}
+                        </div>
+                        
+                        {(isAdding || editingFacilitatorId) && formState.position !== 'Governor' && (
+                            <Card className="p-4 bg-slate-50 dark:bg-slate-900/50 mb-4">
+                                <h4 className="font-bold mb-3">{isAdding ? 'Add New Facilitator' : 'Edit Facilitator'}</h4>
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">User</label>
+                                            {isAdding ? (
+                                                <select name="userId" value={formState.userId || ''} onChange={handleFormChange} className="w-full text-sm p-2 bg-white dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 rounded-lg">
+                                                    <option value="">Select a user</option>
+                                                    {allUsers.filter(u => u.teamId !== AMARANTH_JOKERS_TEAM_ID).map(u => (
+                                                        <option key={u.id} value={u.id}>{u.name}</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <Input label="" id="name" name="name" value={allUsers.find(u => u.id === formState.userId)?.name || ''} disabled />
+                                            )}
+                                        </div>
+                                        <Input label="Position" id="position" name="position" value={formState.position || ''} onChange={handleFormChange}/>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Role Description</label>
+                                        <textarea name="roleDescription" value={formState.roleDescription || ''} onChange={handleFormChange} rows={2} className="w-full text-sm px-3 py-2 bg-white dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Permissions</label>
+                                        {renderPermissionChecklist(formState.permissions || {}, false)}
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+                                    <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
+                                    <Button onClick={handleSave}>Save Facilitator</Button>
+                                </div>
+                            </Card>
+                        )}
+
+                        {otherFacilitators.length > 0 ? (
+                            <div className="space-y-3">
+                                {otherFacilitators.map(renderFacilitatorCard)}
+                            </div>
+                        ) : (
+                            <Card className="p-6 text-center bg-slate-50 dark:bg-slate-900/30">
+                                <i className="bi bi-people text-4xl text-slate-300 dark:text-slate-600 mb-2"></i>
+                                <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">No facilitators assigned yet</p>
+                            </Card>
+                        )}
+                    </div>
+                )}
             </div>
         </>
     );
@@ -980,6 +1081,8 @@ const Teams: React.FC = () => {
   
   const renderTeamCard = (team: Team) => {
       const style = getTeamStyles(team.id);
+      const governors = team.facilitators?.filter(f => f.position === 'Governor') || [];
+      
       return (
         <Card 
             key={team.id} 
@@ -998,6 +1101,29 @@ const Teams: React.FC = () => {
                     <p><i className="bi bi-person-circle mr-2"></i>Leader: {allUsers.find(u => u.id === team.unitLeader)?.name || 'TBA'}</p>
                     <p><i className="bi bi-people mr-2"></i>Members: {team.playersCount}</p>
                 </div>
+                {team.id === AMARANTH_JOKERS_TEAM_ID && governors.length > 0 && (
+                    <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+                        <h5 className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-2">Governors</h5>
+                        <div className="flex flex-wrap gap-2">
+                            {governors.map(gov => {
+                                const govUser = allUsers.find(u => u.id === gov.userId);
+                                return (
+                                    <button
+                                        key={gov.userId}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleTeamSelect(team);
+                                        }}
+                                        className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs rounded-full font-semibold transition-colors"
+                                        title={`${govUser?.name} - Governor`}
+                                    >
+                                        <i className="bi bi-star-fill mr-1"></i>{govUser?.name || 'Unknown'}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
             <div className="mt-auto px-5 pb-5 pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
                 {(isPrivileged || settings.competitionScores) ? <span className="font-bold text-slate-800 dark:text-slate-100">{team.score} pts</span> : <div/>}

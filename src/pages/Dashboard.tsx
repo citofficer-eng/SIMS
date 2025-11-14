@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Card from '../components/Card.tsx';
 import LeaderboardBarChart from '../components/LeaderboardBarChart.tsx';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +15,8 @@ import { usePageViewLogger } from '../hooks/usePageViewLogger.ts';
 import TeamProgressLineChart from '../components/TeamProgressLineChart.tsx';
 import { AMARANTH_JOKERS_TEAM_ID } from '../constants.ts';
 import { getTeamStyles } from '../config.ts';
+import { getSortedTeamsWithRanks } from '../utils/ranking.ts';
+import { TrendIcon, getTrendType } from '../utils/trends.tsx';
 
 const Dashboard: React.FC = () => {
     usePageViewLogger('dashboard');
@@ -25,7 +27,10 @@ const Dashboard: React.FC = () => {
 
     const loading = leaderboardLoading;
     
-    const competingTeams = (leaderboardData || []).filter(t => t.id !== AMARANTH_JOKERS_TEAM_ID);
+    const competingTeams = useMemo(() => {
+        const filtered = (leaderboardData || []).filter(t => t.id !== AMARANTH_JOKERS_TEAM_ID);
+        return getSortedTeamsWithRanks(filtered);
+    }, [leaderboardData]);
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -119,6 +124,7 @@ const Dashboard: React.FC = () => {
 
                     const isPositive = percentageChange >= 0;
                     const teamStyle = getTeamStyles(team.id);
+                    const trendType = getTrendType(percentageChange);
 
                     return (
                         <Card key={team.id} className="p-5 transform transition-transform hover:-translate-y-1">
@@ -127,16 +133,20 @@ const Dashboard: React.FC = () => {
                                 <i className={`${teamStyle.icon} text-2xl`} style={{ color: teamStyle.gradient.from }}></i>
                             </div>
 
-                            <div className="flex items-baseline justify-between mt-2">
-                                <h4 className="font-bold text-2xl text-slate-800 dark:text-slate-100 mb-0">{team.score} Points</h4>
-                                <span className={`font-semibold text-sm ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                                    {percentageChange !== 0 && (isPositive ? '▲' : '▼')}
-                                    {Math.abs(percentageChange).toFixed(1)}%
-                                </span>
+                            <div className="flex items-baseline justify-between mt-3 mb-2">
+                                <h4 className="font-bold text-2xl text-slate-800 dark:text-slate-100 mb-0">{team.score} Pts</h4>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex flex-col items-end">
+                                        <span className={`font-semibold text-sm ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                                            {percentageChange !== 0 ? (isPositive ? '+' : '') + Math.abs(percentageChange).toFixed(1) + '%' : '0%'}
+                                        </span>
+                                    </div>
+                                    <TrendIcon trend={trendType} className="w-5 h-5" />
+                                </div>
                             </div>
-                            <small className="text-slate-500 dark:text-slate-400 mt-1 block">
+                            <small className="text-slate-500 dark:text-slate-400 mt-2 block">
                                 <i className="bi bi-trophy-fill text-yellow-500 mr-1"></i>
-                                {team.placementStats?.first || 0} 1st places
+                                {team.placementStats?.first || 0} 1st place{(team.placementStats?.first || 0) !== 1 ? 's' : ''}
                             </small>
                         </Card>
                     );

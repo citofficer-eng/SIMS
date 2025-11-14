@@ -30,7 +30,7 @@ const setStoredData = <T>(key: string, data: T) => {
 };
 
 // --- MOCK DATA ---
-import { INITIAL_MOCK_USERS, MOCK_LEADERBOARD, MOCK_EVENTS, MOCK_REPORTS, MOCK_NOTIFICATIONS, MOCK_VISIBILITY_SETTINGS } from '../mockData.ts';
+import { INITIAL_MOCK_USERS, MOCK_LEADERBOARD, MOCK_EVENTS, MOCK_REPORTS, MOCK_NOTIFICATIONS, MOCK_VISIBILITY_SETTINGS, MOCK_RULES_DATA } from '../mockData.ts';
 
 // Initialize mock data state
 let usersStore = getStoredData<{ [id: string]: User }>(STORAGE_KEYS.USERS, INITIAL_MOCK_USERS);
@@ -38,6 +38,7 @@ let teamsStore = getStoredData<Team[]>(STORAGE_KEYS.TEAMS, MOCK_LEADERBOARD);
 let eventsStore = getStoredData<Event[]>(STORAGE_KEYS.EVENTS, MOCK_EVENTS);
 let reportsStore = getStoredData<Report[]>(STORAGE_KEYS.REPORTS, MOCK_REPORTS);
 let notificationStore = getStoredData<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, MOCK_NOTIFICATIONS);
+let rulesStore = getStoredData<RulesData>(STORAGE_KEYS.RULES, MOCK_RULES_DATA);
 
 // Bind API_BASE at module initialization for convenience (keeps older code working)
 const API_BASE = getApiBase();
@@ -282,6 +283,13 @@ const mockApi = {
         setStoredData(STORAGE_KEYS.VISIBILITY, visibilityStore);
         return Promise.resolve();
     },
+    
+    getRules: (): Promise<RulesData> => Promise.resolve(rulesStore),
+    updateRules: (rulesData: RulesData): Promise<void> => {
+        rulesStore = rulesData;
+        setStoredData(STORAGE_KEYS.RULES, rulesStore);
+        return Promise.resolve();
+    },
 };
 
 // --- API HELPERS (for real API) ---
@@ -430,4 +438,6 @@ export const updateReportStatus = (reportId: string, status: Report['status']): 
 export const addReportReply = (reportId: string, reply: { reply: string }): Promise<void> => API_BASE === '/mock' ? mockApi.addReportReply(reportId, reply) : apiFetch<void>(`/reports/reply.php?id=${reportId}`, { method: 'POST', body: JSON.stringify(reply) });
 export const getVisibilitySettings = (): Promise<VisibilitySettings> => API_BASE === '/mock' ? mockApi.getVisibilitySettings() : apiFetch<VisibilitySettings>('/system/settings.php');
 export const updateVisibilitySettings = (settings: VisibilitySettings): Promise<void> => API_BASE === '/mock' ? mockApi.updateVisibilitySettings(settings) : apiFetch<void>('/system/settings.php', { method: 'PUT', body: JSON.stringify(settings) });
-export { STORAGE_KEYS };
+export const getRules = (): Promise<RulesData> => API_BASE === '/mock' ? mockApi.getRules() : apiFetch<RulesData>('/system/rules.php');
+export const updateRules = (rulesData: RulesData): Promise<void> => API_BASE === '/mock' ? mockApi.updateRules(rulesData) : apiFetch<void>('/system/rules.php', { method: 'PUT', body: JSON.stringify(rulesData) });
+export { STORAGE_KEYS, UserRole };

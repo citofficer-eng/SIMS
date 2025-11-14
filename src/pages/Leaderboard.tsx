@@ -18,6 +18,8 @@ import { useModal } from '../hooks/useModal.ts';
 import { getTeamStyles } from '../config.ts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePageViewLogger } from '../hooks/usePageViewLogger.ts';
+import { getSortedTeamsWithRanks } from '../utils/ranking.ts';
+import { AMARANTH_JOKERS_TEAM_ID } from '../constants.ts';
 
 type ViewMode = 'standings' | 'records' | 'merits';
 
@@ -28,7 +30,6 @@ const PointLogModalContent: React.FC<{
     onSave: (log: Partial<PointLog> & { teamId: string, type: 'merit' | 'demerit' }) => void;
 }> = ({ log, teams, onClose, onSave }) => {
     const [currentLog, setCurrentLog] = useState(log);
-    const AMARANTH_JOKERS_TEAM_ID = 't5';
     const competingTeams = teams.filter(t => t.id !== AMARANTH_JOKERS_TEAM_ID);
     const selectClass = "w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-800 dark:text-slate-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none";
 
@@ -88,7 +89,6 @@ const Leaderboard: React.FC = () => {
 
   const [expandedTeamIdInView, setExpandedTeamIdInView] = useState<string | null>(null);
 
-  const AMARANTH_JOKERS_TEAM_ID = 't5';
   const canEditScores = user?.role === UserRole.ADMIN || user?.role === UserRole.OFFICER || user?.teamId === AMARANTH_JOKERS_TEAM_ID;
   const isAdmin = user?.role === UserRole.ADMIN;
 
@@ -155,7 +155,11 @@ const Leaderboard: React.FC = () => {
     }
   };
   
-  const competingTeams = teams.filter(t => t.id !== AMARANTH_JOKERS_TEAM_ID);
+  const competingTeams = useMemo(() => {
+    const filtered = teams.filter(t => t.id !== AMARANTH_JOKERS_TEAM_ID);
+    return getSortedTeamsWithRanks(filtered);
+  }, [teams]);
+  
   const allLogs = teams.flatMap(team => [
     ...(team.merits || []).map(log => ({ ...log, teamName: team.name, teamId: team.id, type: 'merit' as const })),
     ...(team.demerits || []).map(log => ({ ...log, teamName: team.name, teamId: team.id, type: 'demerit' as const })),
@@ -432,8 +436,6 @@ const InputScoresModal: React.FC<{event: Event, teams: Team[], onClose: () => vo
         addToast('Failed to save scores.', 'error');
     }
   };
-
-  const AMARANTH_JOKERS_TEAM_ID = 't5';
 
   return (
     <>

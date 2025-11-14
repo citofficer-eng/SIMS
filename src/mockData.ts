@@ -1,4 +1,4 @@
-import { User, UserRole, Team, Event, Report, AppNotification, VisibilitySettings, EventCategory, EventStatus } from './types.ts';
+import { User, UserRole, Team, Event, Report, AppNotification, VisibilitySettings, EventCategory, EventStatus, RulesData } from './types.ts';
 
 export const INITIAL_MOCK_USERS: { [id: string]: User } = {
   'admin_1': {
@@ -54,4 +54,27 @@ export const MOCK_VISIBILITY_SETTINGS: VisibilitySettings = {
   events: { categories: { [EventCategory.JOKER_FLAG]: true, [EventCategory.CIT_QUEST]: true, [EventCategory.MINDSCAPE]: true, [EventCategory.HOOP_SPIKE]: true, [EventCategory.CODING_TECH_CHALLENGES]: true, [EventCategory.PIXEL_PLAY]: true, [EventCategory.TABLE_MASTERS]: true } },
   rules: { sections: { objectives: true, house_rules: true, demerit_system: true, complaints: true, scoring_system: true, categories_mechanics: true } },
   reports: { tabs: { view: true, submit: true } },
+};
+
+export const MOCK_RULES_DATA: RulesData = {
+  mainTitle: 'i3 Day | Clash of Cards',
+  subTitle: 'CIT Tech and Sports Fest 2025',
+  hashTags: '#SDG9 #SDG13 #SDG17',
+  sections: [
+    {
+      id: 'objectives',
+      title: 'Objectives',
+      items: [
+        { type: 'list', items: ['To showcase the diverse talents and skills of information technology students and faculty, fostering a sense of community and camaraderie.', 'To promote sportsmanship, healthy competition, and community spirit among students, faculty, and the wider IT community, encourage teamwork, and foster a supportive atmosphere that promotes growth and learning.'] }
+      ]
+    },
+    {
+      id: 'house_rules',
+      title: 'House Rules',
+      items: [
+        { type: 'heading', level: 3, content: 'Attendance and Participation' },
+        { type: 'list', items: ['All students are required to participate in the events assigned to their units. Attendance is mandatory and will be strictly monitored.', 'This activity is part of the college calendar and is considered a regular class schedule.'] }
+      ]
+    }
+  ]
 };

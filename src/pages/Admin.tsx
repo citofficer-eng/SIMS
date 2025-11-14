@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import Card from '../components/Card.tsx';
 import Button from '../components/Button.tsx';
-import { UserRole, User, Team, Event } from '../types.ts';
+import { UserRole, User, Team, Event, EventCategory } from '../types.ts';
 import { getUsers, updateUserRole, register, STORAGE_KEYS, getLeaderboard, getEvents } from '../services/api.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useModal } from '../hooks/useModal.ts';
@@ -408,6 +408,40 @@ const VisibilitySettings: React.FC = () => {
                 <ToggleSwitch id="lb-records" label="Competition Records Tab" checked={settings.leaderboard.tabs.records} onChange={() => handleToggle(['leaderboard', 'tabs', 'records'], !settings.leaderboard.tabs.records)} />
                 <ToggleSwitch id="lb-merits" label="Merit & Demerit Log Tab" checked={settings.leaderboard.tabs.meritsLog} onChange={() => handleToggle(['leaderboard', 'tabs', 'meritsLog'], !settings.leaderboard.tabs.meritsLog)} />
             </ExpandableCard>
+
+                <ExpandableCard title="Teams Page Sections" cardKey="teams">
+                    <ToggleSwitch id="teams-facilitating" label="Facilitating Team Section" checked={settings.teams.facilitatingTeam} onChange={() => handleToggle(['teams', 'facilitatingTeam'], !settings.teams.facilitatingTeam)} />
+                    <ToggleSwitch id="teams-participating" label="Participating Teams Section" checked={settings.teams.participatingTeams} onChange={() => handleToggle(['teams', 'participatingTeams'], !settings.teams.participatingTeams)} />
+                    <div className="ml-4 space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Team Hub Tabs:</p>
+                        <ToggleSwitch id="teams-tab-overview" label="Overview Tab" checked={settings.teams.tabs.overview} onChange={() => handleToggle(['teams', 'tabs', 'overview'], !settings.teams.tabs.overview)} />
+                        <ToggleSwitch id="teams-tab-leadership" label="Leadership Tab" checked={settings.teams.tabs.leadership} onChange={() => handleToggle(['teams', 'tabs', 'leadership'], !settings.teams.tabs.leadership)} />
+                        <ToggleSwitch id="teams-tab-progress" label="Progress Charts" checked={settings.teams.tabs.progress} onChange={() => handleToggle(['teams', 'tabs', 'progress'], !settings.teams.tabs.progress)} />
+                        <ToggleSwitch id="teams-tab-merits" label="Merits & Demerits" checked={settings.teams.tabs.merits} onChange={() => handleToggle(['teams', 'tabs', 'merits'], !settings.teams.tabs.merits)} />
+                        <ToggleSwitch id="teams-tab-scores" label="Event Scorecards" checked={settings.teams.tabs.scores} onChange={() => handleToggle(['teams', 'tabs', 'scores'], !settings.teams.tabs.scores)} />
+                    </div>
+                </ExpandableCard>
+
+                <ExpandableCard title="Events Categories" cardKey="events">
+                    <div className="space-y-2">
+                        <ToggleSwitch id="event-joker-flag" label={`${EventCategory.JOKER_FLAG}`} checked={settings.events.categories[EventCategory.JOKER_FLAG]} onChange={() => handleToggle(['events', 'categories', EventCategory.JOKER_FLAG], !settings.events.categories[EventCategory.JOKER_FLAG])} />
+                        <ToggleSwitch id="event-cit-quest" label={`${EventCategory.CIT_QUEST}`} checked={settings.events.categories[EventCategory.CIT_QUEST]} onChange={() => handleToggle(['events', 'categories', EventCategory.CIT_QUEST], !settings.events.categories[EventCategory.CIT_QUEST])} />
+                        <ToggleSwitch id="event-mindscape" label={`${EventCategory.MINDSCAPE}`} checked={settings.events.categories[EventCategory.MINDSCAPE]} onChange={() => handleToggle(['events', 'categories', EventCategory.MINDSCAPE], !settings.events.categories[EventCategory.MINDSCAPE])} />
+                        <ToggleSwitch id="event-hoop-spike" label={`${EventCategory.HOOP_SPIKE}`} checked={settings.events.categories[EventCategory.HOOP_SPIKE]} onChange={() => handleToggle(['events', 'categories', EventCategory.HOOP_SPIKE], !settings.events.categories[EventCategory.HOOP_SPIKE])} />
+                        <ToggleSwitch id="event-coding" label={`${EventCategory.CODING_TECH_CHALLENGES}`} checked={settings.events.categories[EventCategory.CODING_TECH_CHALLENGES]} onChange={() => handleToggle(['events', 'categories', EventCategory.CODING_TECH_CHALLENGES], !settings.events.categories[EventCategory.CODING_TECH_CHALLENGES])} />
+                        <ToggleSwitch id="event-pixel-play" label={`${EventCategory.PIXEL_PLAY}`} checked={settings.events.categories[EventCategory.PIXEL_PLAY]} onChange={() => handleToggle(['events', 'categories', EventCategory.PIXEL_PLAY], !settings.events.categories[EventCategory.PIXEL_PLAY])} />
+                        <ToggleSwitch id="event-table-masters" label={`${EventCategory.TABLE_MASTERS}`} checked={settings.events.categories[EventCategory.TABLE_MASTERS]} onChange={() => handleToggle(['events', 'categories', EventCategory.TABLE_MASTERS], !settings.events.categories[EventCategory.TABLE_MASTERS])} />
+                    </div>
+                </ExpandableCard>
+
+                <ExpandableCard title="Rules Sections" cardKey="rules">
+                    <ToggleSwitch id="rules-objectives" label="Objectives Section" checked={settings.rules.sections.objectives} onChange={() => handleToggle(['rules', 'sections', 'objectives'], !settings.rules.sections.objectives)} />
+                    <ToggleSwitch id="rules-house-rules" label="House Rules Section" checked={settings.rules.sections.house_rules} onChange={() => handleToggle(['rules', 'sections', 'house_rules'], !settings.rules.sections.house_rules)} />
+                    <ToggleSwitch id="rules-demerit" label="Demerit System Section" checked={settings.rules.sections.demerit_system} onChange={() => handleToggle(['rules', 'sections', 'demerit_system'], !settings.rules.sections.demerit_system)} />
+                    <ToggleSwitch id="rules-complaints" label="Complaints Section" checked={settings.rules.sections.complaints} onChange={() => handleToggle(['rules', 'sections', 'complaints'], !settings.rules.sections.complaints)} />
+                    <ToggleSwitch id="rules-scoring" label="Scoring System Section" checked={settings.rules.sections.scoring_system} onChange={() => handleToggle(['rules', 'sections', 'scoring_system'], !settings.rules.sections.scoring_system)} />
+                    <ToggleSwitch id="rules-categories" label="Categories & Mechanics Section" checked={settings.rules.sections.categories_mechanics} onChange={() => handleToggle(['rules', 'sections', 'categories_mechanics'], !settings.rules.sections.categories_mechanics)} />
+                </ExpandableCard>
         </div>
     );
 };
