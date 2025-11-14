@@ -4,27 +4,29 @@ import { initFirebase, publishMessage, subscribeToChannel } from '../services/fi
 const FirebaseDemo: React.FC = () => {
   const [initialized, setInitialized] = useState(false);
   const [messages, setMessages] = useState<{ event: string; data: any; timestamp: string }[]>([]);
-  const [channelName, setChannelName] = useState('sims-channel');
-  const [eventName, setEventName] = useState('update-event');
-  const [publishPayload, setPublishPayload] = useState('{"message":"hello from Firebase"}');
+  const [channelName, setChannelName] = useState('sims-realtime');
+  const [eventName, setEventName] = useState('data-update');
+  const [publishPayload, setPublishPayload] = useState('{"status":"active","lastUpdated":"now"}');
   const [status, setStatus] = useState('Initializing...');
   const [unsubscribe, setUnsubscribe] = useState<(() => void) | null>(null);
 
   useEffect(() => {
+    // Initialize Firebase once on mount
     const db = initFirebase();
     if (db) {
       setInitialized(true);
-      setStatus('✓ Firebase initialized');
+      setStatus('✓ Firebase Realtime Database connected');
     } else {
-      setStatus('❌ Firebase not configured. Set env vars VITE_FIREBASE_*');
+      setStatus('❌ Firebase not configured. Add credentials to .env.production');
     }
 
+    // Cleanup on unmount
     return () => {
       if (unsubscribe) {
         unsubscribe();
       }
     };
-  }, [unsubscribe]);
+  }, []);
 
   const handleSubscribe = () => {
     if (!initialized) {
@@ -32,7 +34,7 @@ const FirebaseDemo: React.FC = () => {
       return;
     }
 
-    // Unsubscribe from previous listener
+    // Unsubscribe from previous listener if exists
     if (unsubscribe) {
       unsubscribe();
     }
@@ -40,7 +42,7 @@ const FirebaseDemo: React.FC = () => {
     // Subscribe to new channel
     const unsub = subscribeToChannel(channelName, eventName, (data) => {
       setMessages((prev) => [
-        ...prev,
+        ...prev.slice(-19), // Keep last 20 messages
         {
           event: eventName,
           data,
@@ -50,7 +52,7 @@ const FirebaseDemo: React.FC = () => {
     });
 
     setUnsubscribe(() => unsub);
-    setStatus(`✓ Subscribed to channel "${channelName}" / event "${eventName}"`);
+    setStatus(`✓ Listening to "${channelName}" → "${eventName}"`);
   };
 
   const handlePublish = async () => {
@@ -69,7 +71,7 @@ const FirebaseDemo: React.FC = () => {
       }
 
       await publishMessage(channelName, eventName, payload);
-      setStatus(`📤 Message published to "${channelName}" / "${eventName}"`);
+      setStatus(`📤 Published to "${channelName}" → "${eventName}"`);
     } catch (err: any) {
       setStatus(`✗ Publish error: ${err.message}`);
     }

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getDatabase, Database, ref, set, onValue, off, DataSnapshot } from 'firebase/database';
+import { getDatabase, Database, ref, set, onValue, off, DataSnapshot, push } from 'firebase/database';
 
 let db: Database | null = null;
 
@@ -33,15 +33,29 @@ export function initFirebase() {
   }
 }
 
+/**
+ * Publish a message to a channel (stores in Realtime DB with auto-increment keys)
+ * Messages sync across all connected devices in real-time
+ */
 export function publishMessage(channelName: string, eventName: string, data: any): Promise<void> {
   const database = initFirebase();
   if (!database) return Promise.reject(new Error('Firebase not initialized'));
 
   const timestamp = new Date().toISOString();
-  const msgRef = ref(database, `channels/${channelName}/${eventName}/${Date.now()}`);
-  return set(msgRef, { ...data, timestamp });
+  const channelRef = ref(database, `channels/${channelName}/${eventName}`);
+  const newMessageRef = push(channelRef);
+  
+  return set(newMessageRef, { 
+    ...data, 
+    timestamp,
+    id: newMessageRef.key 
+  });
 }
 
+/**
+ * Subscribe to real-time updates on a channel
+ * Callback fires whenever data changes on any device
+ */
 export function subscribeToChannel(
   channelName: string,
   eventName: string,
@@ -51,19 +65,62 @@ export function subscribeToChannel(
   if (!database) return () => {};
 
   const messagesRef = ref(database, `channels/${channelName}/${eventName}`);
+  
   const listener = (snapshot: DataSnapshot) => {
     if (snapshot.exists()) {
-      const messages = snapshot.val();
-      // Get latest message (most recent by timestamp)
-      const latestKey = Object.keys(messages).sort().pop();
-      if (latestKey) {
-        callback(messages[latestKey]);
+      const allMessages = snapshot.val();
+      if (typeof allMessages === 'object' && allMessages !== null) {
+        // Get the most recent message
+        const latestKey = Object.keys(allMessages).sort().pop();
+        if (latestKey) {
+          callback(allMessages[latestKey]);
+        }
+      } else {
+        callback(allMessages);
       }
     }
   };
 
   onValue(messagesRef, listener);
+  
+  // Return unsubscribe function
   return () => off(messagesRef, 'value', listener);
+}
+
+/**
+ * Subscribe to all data in a path (for leaderboards, user lists, etc.)
+ */
+export function subscribeToData(
+  path: string,
+  callback: (data: any) => void
+): () => void {
+  const database = initFirebase();
+  if (!database) return () => {};
+
+  const dataRef = ref(database, path);
+  
+  const listener = (snapshot: DataSnapshot) => {
+    if (snapshot.exists()) {
+      callback(snapshot.val());
+    } else {
+      callback(null);
+    }
+  };
+
+  onValue(dataRef, listener);
+  
+  return () => off(dataRef, 'value', listener);
+}
+
+/**
+ * Update data at a specific path (overwrites)
+ */
+export function updateData(path: string, data: any): Promise<void> {
+  const database = initFirebase();
+  if (!database) return Promise.reject(new Error('Firebase not initialized'));
+
+  const dataRef = ref(database, path);
+  return set(dataRef, data);
 }
 
 export function shutdownFirebase() {

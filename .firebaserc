@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "sims-41ff9"
-  }
+    "default": "sims-41ff9",
+    "staging": "sims-41ff9"
+  },
+  "targets": {},
+  "etags": {}
 }
