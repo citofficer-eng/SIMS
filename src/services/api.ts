@@ -1,4 +1,4 @@
-import { API_BASE } from '../../constants.ts';
+import { getApiBase } from '../constants.ts';
 import { User, UserRole, Team, Event, Report, PointLog, ReportReply, Roster, RulesData, EventResult, AppNotification, Activity, VisibilitySettings, JoinRequest, EventStatus, EventCategory, CriteriaItem, ScoreAdjustment } from '../types.ts';
 
 // --- MOCK DATA & STORAGE ---
@@ -38,6 +38,9 @@ let teamsStore = getStoredData<Team[]>(STORAGE_KEYS.TEAMS, MOCK_LEADERBOARD);
 let eventsStore = getStoredData<Event[]>(STORAGE_KEYS.EVENTS, MOCK_EVENTS);
 let reportsStore = getStoredData<Report[]>(STORAGE_KEYS.REPORTS, MOCK_REPORTS);
 let notificationStore = getStoredData<AppNotification[]>(STORAGE_KEYS.NOTIFICATIONS, MOCK_NOTIFICATIONS);
+
+// Bind API_BASE at module initialization for convenience (keeps older code working)
+const API_BASE = getApiBase();
 let visibilityStore = getStoredData<VisibilitySettings>(STORAGE_KEYS.VISIBILITY, MOCK_VISIBILITY_SETTINGS);
 let activityStore = getStoredData<Activity[]>(STORAGE_KEYS.ACTIVITIES, []);
 

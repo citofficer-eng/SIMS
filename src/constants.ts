@@ -6,8 +6,8 @@ import { UserRole } from './types.ts';
 // When deployed to a static host (like Firebase Hosting or GitHub Pages) we cannot run PHP,
 // so default to the mock API if the host is github.io, firebase.web.app, or VITE_API_BASE is set to '/mock'.
 
-// Runtime detection: check hostname FIRST to ensure Firebase/GitHub Pages always use /mock
-function getApiBase(): string {
+// IMPORTANT: This function is called dynamically to ensure we always check the current hostname
+export function getApiBase(): string {
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isGithubPages = hostname.endsWith('github.io');
   const isFirebaseHosting = hostname.endsWith('web.app');
@@ -27,7 +27,8 @@ function getApiBase(): string {
   return result;
 }
 
-export const API_BASE = getApiBase();
+// Call once on module load for initial logging
+getApiBase();
 
 export const ROLES = {
   USER: UserRole.USER,

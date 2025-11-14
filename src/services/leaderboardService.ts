@@ -1,5 +1,5 @@
 
-import { API_BASE } from '../constants';
+import { getApiBase } from '../constants';
 import { Team } from '../types';
 import { getLeaderboard } from './api';
 
@@ -9,7 +9,8 @@ export class LeaderboardSync {
   private sse: EventSource | null = null;
   private pollInterval: number | null = null;
   private callback: LeaderboardCallback | null = null;
-  private sseUrl = `${API_BASE}/sse/leaderboard.php`; 
+  private API_BASE = getApiBase();
+  private sseUrl = `${this.API_BASE}/sse/leaderboard.php`;
 
   subscribe(callback: LeaderboardCallback) {
     this.callback = callback;
@@ -24,7 +25,7 @@ export class LeaderboardSync {
 
   private startSse() {
     // Only attempt SSE if not using the mock API and it's a real remote URL
-    if (API_BASE !== '/mock' && API_BASE.startsWith('http')) {
+    if (this.API_BASE !== '/mock' && this.API_BASE.startsWith('http')) {
         this.sse = new EventSource(this.sseUrl);
 
         this.sse.onmessage = (event) => {
