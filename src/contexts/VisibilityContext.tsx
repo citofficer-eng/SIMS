@@ -216,17 +216,20 @@ export const VisibilityProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const isPrivileged = user?.role === UserRole.ADMIN || user?.teamId === AMARANTH_JOKERS_TEAM_ID;
 
     const setSettings = (newSettings: VisibilitySettings) => {
+    // Update version/updatedAt for conflict handling
+    const next = { ...newSettings, version: (newSettings.version || 0) + 1, updatedAt: new Date().toISOString() };
+
     // Update local state & storage immediately for instant UI feedback
-    localStorage.setItem(STORAGE_KEY_VISIBILITY, JSON.stringify(newSettings));
+    localStorage.setItem(STORAGE_KEY_VISIBILITY, JSON.stringify(next));
     // store a timestamp so we have a lightweight last-write indicator
     try { localStorage.setItem(`${STORAGE_KEY_VISIBILITY}_ts`, new Date().toISOString()); } catch {}
-    setSettingsState(newSettings);
+    setSettingsState(next);
     window.dispatchEvent(new CustomEvent(STORAGE_EVENT_KEY, { detail: { key: STORAGE_KEY_VISIBILITY } }));
 
     // Enqueue for background sync so devices that are offline will flush later.
     try {
       import('../utils/syncQueue').then(({ enqueue, processQueue }) => {
-        enqueue('visibility:update', newSettings);
+        enqueue('visibility:update', next);
         // Also log activity for auditing
         enqueue('activity:log', { userId: (user && user.id) || 'unknown', action: 'updated_visibility_settings' });
         // Kickoff a background process (best-effort)

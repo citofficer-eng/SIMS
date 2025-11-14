@@ -250,6 +250,9 @@ export interface Report {
 }
 
 export interface VisibilitySettings {
+  // Optional metadata for conflict/version handling
+  version?: number;
+  updatedAt?: string;
   competitionScores: boolean;
 
   pages: {

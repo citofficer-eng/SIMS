@@ -127,7 +127,16 @@ const Leaderboard: React.FC = () => {
         }
         closeModal();
     } catch (error: any) {
-        addToast(error.message || 'Failed to save log entry.', 'error');
+        // If saving failed (likely offline), enqueue for background sync
+        try {
+            const { enqueue, processQueue } = await import('../utils/syncQueue');
+            enqueue('point:add', logToSave);
+            processQueue();
+            addToast('Log entry queued — will sync when online.', 'info');
+            closeModal();
+        } catch (e) {
+            addToast(error.message || 'Failed to save log entry.', 'error');
+        }
     }
   };
 

@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types.ts';
-import { login as apiLogin, register as apiRegister, loginWithGoogle as apiLoginWithGoogle, completeUserProfile, logActivity, getUsers } from '../services/api.ts';
+import { login as apiLogin, register as apiRegister, loginWithGoogle as apiLoginWithGoogle, completeUserProfile, logActivity, getUsers, getCurrentUser } from '../services/api.ts';
 
 interface AuthContextType {
   user: User | null;
@@ -53,32 +53,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Refresh the user from the server (or mock API) so we get up-to-date
         // profile, role, and team membership. This enables cross-device sync
-        // when a real backend is configured. Prefer a dedicated 'me' endpoint if available.
+        // when a real backend is configured.
         (async () => {
           try {
-            // try to import getCurrentUser dynamically (if present)
-            let refreshed = null as User | null;
-            try {
-              const mod = await import('../services/api');
-              if (typeof mod.getCurrentUser === 'function') {
-                refreshed = await mod.getCurrentUser();
-              }
-            } catch (e) {
-              // fallback to scanning all users
-              try {
-                const all = await getUsers();
-                refreshed = all.find(u => u.id === parsed.id) || null;
-              } catch (err) {
-                console.warn('Could not refresh user from server (fallback):', err);
-              }
-            }
-
+            const refreshed = await getCurrentUser();
             if (refreshed) {
               setUser(refreshed);
               localStorage.setItem('user', JSON.stringify(refreshed));
             }
           } catch (err) {
-            console.warn('Could not refresh user from server:', err);
+            // fallback to scanning all users if getCurrentUser isn't available or fails
+            try {
+              const all = await getUsers();
+              const fresh = all.find(u => u.id === parsed.id);
+              if (fresh) {
+                setUser(fresh);
+                localStorage.setItem('user', JSON.stringify(fresh));
+              }
+            } catch (err2) {
+              console.warn('Could not refresh user from server:', err2);
+            }
           }
         })();
       }

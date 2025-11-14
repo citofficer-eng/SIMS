@@ -1,10 +1,10 @@
-import { updateVisibilitySettings, updateRules, addPointLog, updateEvent, logActivity } from '../services/api';
+import { updateVisibilitySettings, updateRules, addPointLog, updateEvent, logActivity, updateTeam } from '../services/api';
 
 const QUEUE_KEY = 'sims_sync_queue_v1';
 
-type SyncAction = {
+  type SyncAction = {
   id: string;
-  type: 'visibility:update' | 'rules:update' | 'point:add' | 'event:update' | 'activity:log';
+  type: 'visibility:update' | 'rules:update' | 'point:add' | 'event:update' | 'activity:log' | 'team:update';
   payload: any;
   attempts: number;
   createdAt: string;
@@ -46,11 +46,26 @@ export const processQueue = async (opts?: { onProgress?: (remaining: number) => 
   for (const action of q) {
     try {
       if (action.type === 'visibility:update') {
+        // Conflict-aware update: fetch remote and compare versions when possible
+        try {
+          const remote = await (await import('../services/api')).getVisibilitySettings();
+          const remoteVersion = remote?.version || 0;
+          const localVersion = action.payload?.version || 0;
+          if (remoteVersion > localVersion) {
+            // remote is newer - skip applying to avoid overwrite
+            console.warn('Skipping visibility update due to newer server version');
+            continue;
+          }
+        } catch (e) {
+          // ignore and attempt update
+        }
         await updateVisibilitySettings(action.payload);
       } else if (action.type === 'rules:update') {
         await updateRules(action.payload);
       } else if (action.type === 'point:add') {
         await addPointLog(action.payload);
+      } else if (action.type === 'team:update') {
+        await updateTeam(action.payload);
       } else if (action.type === 'event:update') {
         await updateEvent(action.payload);
       } else if (action.type === 'activity:log') {

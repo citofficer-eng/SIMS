@@ -251,6 +251,7 @@ const getUserName = (userId: string | undefined, allUsers: User[]): string => {
 const JokerTeamHub: React.FC<{ team: Team, allUsers: User[], onClose: () => void }> = ({ team, allUsers, onClose }) => {
     const { isAdmin } = usePermissions();
     const { addToast } = useToast();
+    const { user } = useAuth();
     
     const [localTeam, setLocalTeam] = useState(team);
     const [editingFacilitatorId, setEditingFacilitatorId] = useState<string | null>(null);
@@ -321,7 +322,8 @@ const JokerTeamHub: React.FC<{ team: Team, allUsers: User[], onClose: () => void
             handleCancel();
             addToast(`Facilitator ${isAdding ? 'added' : 'updated'}.`, 'success');
         } catch (error) {
-            addToast('Failed to update facilitators.', 'error');
+            addToast('Failed to update facilitators; changes will be synced when online.', 'info');
+            try { const { enqueue, processQueue } = await import('../utils/syncQueue'); enqueue('team:update', { ...localTeam, facilitators: updatedFacilitators }); enqueue('activity:log', { userId: (user && user.id) || 'unknown', action: 'updated_facilitators', target: { type: 'team', name: localTeam.name, link: `/teams?teamId=${localTeam.id}` } }); processQueue(); } catch (e) { console.warn('Failed to enqueue team update', e); }
         }
     };
     
@@ -333,7 +335,8 @@ const JokerTeamHub: React.FC<{ team: Team, allUsers: User[], onClose: () => void
             await updateTeam({ ...localTeam, facilitators: updatedFacilitators });
             addToast('Facilitator removed.', 'success');
         } catch (error) {
-            addToast('Failed to remove facilitator.', 'error');
+            addToast('Failed to remove facilitator; change will be synced when online.', 'info');
+            try { const { enqueue, processQueue } = await import('../utils/syncQueue'); enqueue('team:update', { ...localTeam, facilitators: updatedFacilitators }); enqueue('activity:log', { userId: (user && user.id) || 'unknown', action: 'removed_facilitator', target: { type: 'team', name: localTeam.name, link: `/teams?teamId=${localTeam.id}` } }); processQueue(); } catch (e) { console.warn('Failed to enqueue team update', e); }
         }
     };
 
@@ -554,6 +557,7 @@ export const TeamHub: React.FC<TeamHubProps> = ({ team, allUsers, allEvents, onC
   const { theme } = useTheme();
   const { canManageTeamInfo, canViewDemeritDetails } = usePermissions();
   const { settings, isPrivileged } = useVisibility();
+    const { user } = useAuth();
 
   const { data: teamMembers, loading: membersLoading } = useSyncedData(
     () => getTeamUsers(team.id),
@@ -626,7 +630,8 @@ export const TeamHub: React.FC<TeamHubProps> = ({ team, allUsers, allEvents, onC
         addToast("Team description updated!", "success");
         setIsEditingDescription(false);
       } catch (error) {
-        addToast("Failed to update description.", "error");
+                addToast("Failed to update description; change will be synced when online.", "info");
+                try { const { enqueue, processQueue } = await import('../utils/syncQueue'); enqueue('team:update', { ...team, description }); enqueue('activity:log', { userId: (user && user.id) || 'unknown', action: 'updated_team_description', target: { type: 'team', name: team.name, link: `/teams?teamId=${team.id}` } }); processQueue(); } catch (e) { console.warn('Failed to enqueue team description update', e); }
       }
   };
 
@@ -637,7 +642,8 @@ export const TeamHub: React.FC<TeamHubProps> = ({ team, allUsers, allEvents, onC
         addToast("Leadership details saved!", "success");
         setIsEditingLeadership(false);
       } catch (error) {
-        addToast("Failed to save details.", "error");
+                addToast("Failed to save leadership; change will be synced when online.", "info");
+                try { const { enqueue, processQueue } = await import('../utils/syncQueue'); enqueue('team:update', { ...team, ...leadershipForm }); enqueue('activity:log', { userId: (user && user.id) || 'unknown', action: 'updated_team_leadership', target: { type: 'team', name: team.name, link: `/teams?teamId=${team.id}` } }); processQueue(); } catch (e) { console.warn('Failed to enqueue team leadership update', e); }
       }
   };
   
