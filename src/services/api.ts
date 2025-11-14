@@ -13,6 +13,9 @@ const STORAGE_KEYS = {
     VISIBILITY: 'sims_visibility_settings'
 };
 
+// Firebase listener map for real-time updates
+const firebaseListeners: Map<string, () => void> = new Map();
+
 // In-memory store initialized from local storage or defaults
 const getStoredData = <T>(key: string, defaultValue: T): T => {
     const stored = localStorage.getItem(key);
@@ -27,6 +30,49 @@ const getStoredData = <T>(key: string, defaultValue: T): T => {
 const setStoredData = <T>(key: string, data: T) => {
     localStorage.setItem(key, JSON.stringify(data));
     window.dispatchEvent(new CustomEvent('storage-update', { detail: { key } }));
+};
+
+// Firebase DB helper
+const getFirebaseDB = () => {
+    try {
+        const { initFirebase } = require('./firebase');
+        return initFirebase();
+    } catch (e) {
+        return null;
+    }
+};
+
+const subscribeToFirebaseData = <T>(path: string, callback: (data: T) => void): (() => void) => {
+    try {
+        const db = getFirebaseDB();
+        if (!db) return () => {};
+        const { ref, onValue, off } = require('firebase/database');
+        const dbRef = ref(db, path);
+        onValue(dbRef, (snapshot: any) => {
+            if (snapshot.exists()) {
+                callback(snapshot.val());
+            }
+        });
+        const unsubscribe = () => { try { off(dbRef); } catch (e) {} };
+        firebaseListeners.set(path, unsubscribe);
+        return unsubscribe;
+    } catch (e) {
+        console.warn('Firebase subscription failed for', path, e);
+        return () => {};
+    }
+};
+
+const writeToFirebaseData = async <T>(path: string, data: T): Promise<void> => {
+    try {
+        const db = getFirebaseDB();
+        if (!db) return Promise.resolve();
+        const { ref, set } = require('firebase/database');
+        const dbRef = ref(db, path);
+        return set(dbRef, data);
+    } catch (e) {
+        console.warn('Firebase write failed for', path, e);
+        return Promise.resolve();
+    }
 };
 
 // --- MOCK DATA ---
@@ -147,6 +193,8 @@ const mockApi = {
         if (teamIndex > -1) {
             teamsStore[teamIndex] = { ...teamsStore[teamIndex], ...teamData };
             setStoredData(STORAGE_KEYS.TEAMS, teamsStore);
+            // Write to Firebase
+            writeToFirebaseData(`teams/${teamData.id}`, teamsStore[teamIndex]).catch(e => console.warn('Firebase team update failed', e));
             return Promise.resolve(teamsStore[teamIndex]);
         }
         return Promise.reject(new Error("Team not found"));
@@ -192,6 +240,7 @@ const mockApi = {
         const team = teamsStore.find(t => t.id === log.teamId);
         if (team) {
             const logEntry: PointLog = { id: `log_${Date.now()}`, updatedBy: 'Admin', timestamp: new Date().toISOString(), ...log };
+            const previousScore = team.score || 0;
             if (log.type === 'merit') {
                 team.merits = [...(team.merits || []), logEntry];
                 team.score += log.points;
@@ -199,7 +248,20 @@ const mockApi = {
                 team.demerits = [...(team.demerits || []), logEntry];
                 team.score -= log.points;
             }
+            // Update detailed progress history
+            team.detailedProgressHistory = team.detailedProgressHistory || [];
+            team.detailedProgressHistory.push({
+                timestamp: logEntry.timestamp,
+                score: team.score,
+                reason: log.reason,
+                change: team.score - previousScore
+            });
+            // Update simple progress history
+            team.progressHistory = team.progressHistory || [];
+            team.progressHistory.push({ date: logEntry.timestamp, score: team.score });
             setStoredData(STORAGE_KEYS.TEAMS, teamsStore);
+            // Write to Firebase
+            writeToFirebaseData(`teams/${team.id}`, team).catch(e => console.warn('Firebase point log update failed', e));
         }
         return Promise.resolve();
     },
@@ -503,4 +565,4 @@ export const pingServer = async (): Promise<boolean> => {
 };
 export const getRules = (): Promise<RulesData> => API_BASE === '/mock' ? mockApi.getRules() : apiFetch<RulesData>('/system/rules.php');
 export const updateRules = (rulesData: RulesData): Promise<void> => API_BASE === '/mock' ? mockApi.updateRules(rulesData) : apiFetch<void>('/system/rules.php', { method: 'PUT', body: JSON.stringify(rulesData) });
-export { STORAGE_KEYS, UserRole };
+export { STORAGE_KEYS, UserRole, subscribeToFirebaseData, writeToFirebaseData, firebaseListeners };

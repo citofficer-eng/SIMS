@@ -4,7 +4,7 @@ import LeaderboardBarChart from '../components/LeaderboardBarChart.tsx';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Team } from '../types.ts';
-import { getLeaderboard, STORAGE_KEYS } from '../services/api.ts';
+import { getLeaderboard, STORAGE_KEYS, subscribeToFirebaseData } from '../services/api.ts';
 import { useEventContext } from '../hooks/useEventContext.ts';
 import { availableEvents } from '../contexts/EventContext.tsx';
 import AnimatedPage from '../components/AnimatedPage.tsx';
@@ -23,9 +23,42 @@ const Dashboard: React.FC = () => {
     const { selectedEvent, setSelectedEvent, isDataAvailable } = useEventContext();
     const navigate = useNavigate();
     
-    const { data: leaderboardData, loading: leaderboardLoading } = useSyncedData<Team[]>(getLeaderboard, [STORAGE_KEYS.TEAMS, STORAGE_KEYS.EVENTS, STORAGE_KEYS.USERS]);
+    // Subscribe to Firebase real-time updates for teams
+    const [leaderboardData, setLeaderboardData] = useState<Team[] | null>(null);
+    const [leaderboardLoading, setLeaderboardLoading] = useState(true);
 
-    const loading = leaderboardLoading;
+    useEffect(() => {
+        let isMounted = true;
+
+        // Initial fetch
+        const doFetch = async () => {
+            try {
+                const data = await getLeaderboard();
+                if (isMounted) {
+                    setLeaderboardData(data);
+                    setLeaderboardLoading(false);
+                }
+            } catch (e) {
+                console.warn('Failed to fetch leaderboard', e);
+                if (isMounted) setLeaderboardLoading(false);
+            }
+        };
+
+        doFetch();
+
+        // Subscribe to Firebase real-time updates
+        const unsubscribe = subscribeToFirebaseData('teams', (teamsData: { [key: string]: Team }) => {
+            if (isMounted && teamsData) {
+                const teamsArray = Object.values(teamsData);
+                setLeaderboardData(teamsArray);
+            }
+        });
+
+        return () => {
+            isMounted = false;
+            unsubscribe();
+        };
+    }, []);
     
     const competingTeams = useMemo(() => {
         const filtered = (leaderboardData || []).filter(t => t.id !== AMARANTH_JOKERS_TEAM_ID);
@@ -110,7 +143,7 @@ const Dashboard: React.FC = () => {
           </div>
        </div>
 
-      { !isDataAvailable ? <NoDataComponent /> : loading ? renderSkeletons() : (
+      { !isDataAvailable ? <NoDataComponent /> : leaderboardLoading ? renderSkeletons() : (
         <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {competingTeams.slice(0, 4).map((team) => {
