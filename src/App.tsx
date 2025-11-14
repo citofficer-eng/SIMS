@@ -17,6 +17,7 @@ import Leaderboard from './pages/Leaderboard.tsx';
 import Events from './pages/Events.tsx';
 import Profile from './pages/Profile.tsx';
 import Admin from './pages/Admin.tsx';
+import AuditAdmin from './pages/AuditAdmin.tsx';
 import Layout from './components/Layout.tsx';
 import { UserRole } from './types.ts';
 import Rules from './pages/Rules.tsx';
@@ -62,6 +63,7 @@ function App() {
                         <Route path="profile" element={<Profile />} />
                         <Route path="profile/:userId" element={<Profile />} />
                         <Route path="admin" element={<ProtectedRoute roles={[UserRole.ADMIN]}><Admin /></ProtectedRoute>} />
+                        <Route path="admin/audit" element={<ProtectedRoute roles={[UserRole.ADMIN]}><AuditAdmin /></ProtectedRoute>} />
                       </Route>
                       <Route path="*" element={<Navigate to="/" />} />
                     </Routes>

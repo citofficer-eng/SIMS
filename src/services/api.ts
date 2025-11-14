@@ -58,6 +58,14 @@ const broadcastNotification = (title: string, message: string, link: string, typ
 
 // --- MOCK API IMPLEMENTATION ---
 const mockApi = {
+    getActivities: (): Promise<Activity[]> => Promise.resolve(activityStore),
+    logActivity: (userId: string, action: string, target?: Activity['target']): Promise<void> => {
+        const entry: Activity = { id: `act_${Date.now()}`, userId, action, target, timestamp: new Date().toISOString() } as Activity;
+        activityStore.unshift(entry);
+        if (activityStore.length > 200) activityStore = activityStore.slice(0, 200);
+        setStoredData(STORAGE_KEYS.ACTIVITIES, activityStore);
+        return Promise.resolve();
+    },
     login: (email: string, pass: string): Promise<User> => new Promise((resolve, reject) => {
         setTimeout(() => {
             const user = Object.values(usersStore).find(u => u.email.toLowerCase() === email.toLowerCase());
@@ -450,7 +458,25 @@ export const updateEvent = (eventData: Event): Promise<Event> => API_BASE === '/
 export const deleteEvent = (eventId: string): Promise<void> => API_BASE === '/mock' ? mockApi.deleteEvent(eventId) : apiFetch<void>(`/events/delete.php?id=${eventId}`, { method: 'DELETE' });
 export const updateEventResults = (eventId: string, results: EventResult[]): Promise<Event> => API_BASE === '/mock' ? mockApi.updateEventResults(eventId, results) : apiFetch<Event>(`/events/results.php?id=${eventId}`, { method: 'PUT', body: JSON.stringify({ results }) });
 export const getNotifications = (): Promise<AppNotification[]> => API_BASE === '/mock' ? mockApi.getNotifications() : apiFetch<AppNotification[]>('/system/notifications.php');
-export const logActivity = async (userId: string, action: string, target?: Activity['target']): Promise<void> => console.log(`Activity Log (not sent): User ${userId} ${action}`, target || '');
+export const logActivity = async (userId: string, action: string, target?: Activity['target']): Promise<void> => {
+    if (API_BASE === '/mock') return mockApi.logActivity(userId, action, target);
+    try {
+        return await apiFetch<void>('/activities/index.php', { method: 'POST', body: JSON.stringify({ userId, action, target }) });
+    } catch (e) {
+        console.warn('logActivity failed', e);
+        // fall back to console log to avoid blocking callers
+        console.log(`Activity Log (queued): User ${userId} ${action}`, target || '');
+    }
+};
+export const getAuditLogs = async (): Promise<Activity[]> => {
+    if (API_BASE === '/mock') return mockApi.getActivities();
+    try {
+        return await apiFetch<Activity[]>('/activities/index.php');
+    } catch (e) {
+        console.warn('getAuditLogs failed', e);
+        return [];
+    }
+};
 export const addPointLog = (log: { teamId: string, type: 'merit' | 'demerit', reason: string, points: number }): Promise<void> => API_BASE === '/mock' ? mockApi.addPointLog(log) : apiFetch<void>('/points/index.php', { method: 'POST', body: JSON.stringify(log) });
 export const deletePointLog = (logId: string): Promise<void> => API_BASE === '/mock' ? mockApi.deletePointLog(logId) : apiFetch<void>(`/points/delete.php?id=${logId}`, { method: 'DELETE' });
 export const updatePointLog = (logId: string, updatedLog: Partial<PointLog> & { teamId: string }): Promise<void> => API_BASE === '/mock' ? mockApi.updatePointLog(logId, updatedLog) : apiFetch<void>(`/points/update.php?id=${logId}`, { method: 'PUT', body: JSON.stringify({ team_id: updatedLog.teamId, reason: updatedLog.reason, points: updatedLog.points }) });

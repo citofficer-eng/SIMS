@@ -1,4 +1,5 @@
 import { updateVisibilitySettings, updateRules, addPointLog, updateEvent, logActivity, updateTeam } from '../services/api';
+import { getKV, setKV } from './idb';
 
 const QUEUE_KEY = 'sims_sync_queue_v1';
 
@@ -24,6 +25,8 @@ const readQueue = (): SyncAction[] => {
 const writeQueue = (q: SyncAction[]) => {
   try {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    // Mirror to IndexedDB asynchronously for more robust persistence
+    try { setKV(QUEUE_KEY, q).catch(() => {}); } catch {}
   } catch (e) {
     console.error('Failed to write sync queue', e);
   }
@@ -52,6 +55,7 @@ export const removeFromQueue = (id: string) => {
   try {
     const q = readQueue().filter(a => a.id !== id);
     writeQueue(q);
+    try { setKV(QUEUE_KEY, q).catch(() => {}); } catch {}
     return true;
   } catch (e) {
     console.warn('Failed to remove from queue', e);
@@ -67,6 +71,7 @@ export const retryNow = (id: string) => {
     q[idx].nextAttemptAt = new Date().toISOString();
     q[idx].attempts = 0;
     writeQueue(q);
+    try { setKV(QUEUE_KEY, q).catch(() => {}); } catch {}
     return true;
   } catch (e) {
     console.warn('Failed to schedule retry for', id, e);
@@ -147,5 +152,20 @@ export const processQueue = async (opts?: { onProgress?: (remaining: number) => 
 export const clearQueue = () => {
   try { localStorage.removeItem(QUEUE_KEY); } catch {}
 };
+
+// Migrate existing localStorage queue into IndexedDB if needed
+(async () => {
+  try {
+    const existing = await getKV(QUEUE_KEY);
+    if (!existing) {
+      const raw = localStorage.getItem(QUEUE_KEY);
+      if (raw) {
+        try { await setKV(QUEUE_KEY, JSON.parse(raw)); } catch (e) { console.warn('Failed to migrate queue to IDB', e); }
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+})();
 
 export default { enqueue, processQueue, clearQueue };
