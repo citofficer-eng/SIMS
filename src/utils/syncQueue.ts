@@ -48,6 +48,32 @@ export const getQueueStats = () => {
   return { pending, nextAttemptAt };
 };
 
+export const removeFromQueue = (id: string) => {
+  try {
+    const q = readQueue().filter(a => a.id !== id);
+    writeQueue(q);
+    return true;
+  } catch (e) {
+    console.warn('Failed to remove from queue', e);
+    return false;
+  }
+};
+
+export const retryNow = (id: string) => {
+  try {
+    const q = readQueue();
+    const idx = q.findIndex(a => a.id === id);
+    if (idx === -1) return false;
+    q[idx].nextAttemptAt = new Date().toISOString();
+    q[idx].attempts = 0;
+    writeQueue(q);
+    return true;
+  } catch (e) {
+    console.warn('Failed to schedule retry for', id, e);
+    return false;
+  }
+};
+
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 const MAX_ATTEMPTS = 6;

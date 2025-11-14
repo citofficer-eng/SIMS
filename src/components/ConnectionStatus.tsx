@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { pingServer } from '../services/api';
 import { getQueueStats } from '../utils/syncQueue';
+import QueuePanel from './QueuePanel';
 
 const ConnectionStatus: React.FC = () => {
   const [online, setOnline] = useState<boolean>(navigator.onLine);
   const [backendAlive, setBackendAlive] = useState<boolean | null>(null);
   const [pending, setPending] = useState<number>(0);
   const [nextAttemptAt, setNextAttemptAt] = useState<string | null>(null);
+  const [showPanel, setShowPanel] = useState(false);
 
   useEffect(() => {
     const onOnline = () => setOnline(true);
@@ -57,10 +59,15 @@ const ConnectionStatus: React.FC = () => {
       {pending > 0 && (
         <>
           <span className="mx-2">•</span>
-          <span>{pending} pending</span>
+          <button className="underline text-sm" onClick={() => setShowPanel(s => !s)}>{pending} pending</button>
           {nextAttemptAt && <span className="mx-2">•</span>}
           {nextAttemptAt && <span>next: {new Date(nextAttemptAt).toLocaleTimeString()}</span>}
         </>
+      )}
+      {showPanel && (
+        <div className="absolute z-50 mt-8 right-2">
+          <QueuePanel onClose={() => setShowPanel(false)} />
+        </div>
       )}
     </div>
   );
