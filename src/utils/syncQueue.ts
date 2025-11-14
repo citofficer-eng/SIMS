@@ -8,6 +8,7 @@ const QUEUE_KEY = 'sims_sync_queue_v1';
   payload: any;
   attempts: number;
   createdAt: string;
+  nextAttemptAt?: string | null;
 };
 
 const readQueue = (): SyncAction[] => {
@@ -30,20 +31,30 @@ const writeQueue = (q: SyncAction[]) => {
 
 export const enqueue = (type: SyncAction['type'], payload: any) => {
   const q = readQueue();
-  const action: SyncAction = { id: `act_${Date.now()}_${Math.random().toString(36).slice(2,8)}`, type, payload, attempts: 0, createdAt: new Date().toISOString() };
+  const action: SyncAction = { id: `act_${Date.now()}_${Math.random().toString(36).slice(2,8)}`, type, payload, attempts: 0, createdAt: new Date().toISOString(), nextAttemptAt: null };
   q.push(action);
   writeQueue(q);
 };
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
+const MAX_ATTEMPTS = 6;
+const BASE_DELAY_MS = 1000; // base backoff
+const JITTER_MS = 300;
+
 export const processQueue = async (opts?: { onProgress?: (remaining: number) => void }) => {
-  let q = readQueue();
-  if (!q.length) return;
+  const fullQueue = readQueue();
+  if (!fullQueue.length) return;
+
+  const now = Date.now();
+  const eligible = fullQueue.filter(a => !a.nextAttemptAt || new Date(a.nextAttemptAt).getTime() <= now);
+  const ineligible = fullQueue.filter(a => a.nextAttemptAt && new Date(a.nextAttemptAt).getTime() > now);
+
+  if (!eligible.length) return; // nothing due to run
 
   const remainingAfter: SyncAction[] = [];
 
-  for (const action of q) {
+  for (const action of eligible) {
     try {
       if (action.type === 'visibility:update') {
         // Conflict-aware update: fetch remote and compare versions when possible
@@ -75,15 +86,24 @@ export const processQueue = async (opts?: { onProgress?: (remaining: number) => 
     } catch (err) {
       console.warn('Sync action failed, will retry later', action.type, err);
       action.attempts = (action.attempts || 0) + 1;
-      // simple backoff: if attempts < 5, keep in queue, else drop
-      if (action.attempts < 5) remainingAfter.push(action);
+      if (action.attempts < MAX_ATTEMPTS) {
+        // exponential backoff with jitter
+        const backoff = BASE_DELAY_MS * Math.pow(2, action.attempts - 1);
+        const jitter = Math.floor(Math.random() * JITTER_MS);
+        action.nextAttemptAt = new Date(Date.now() + backoff + jitter).toISOString();
+        remainingAfter.push(action);
+      } else {
+        console.warn('Dropping sync action after max attempts', action.id, action.type);
+      }
     }
-    if (opts?.onProgress) opts.onProgress(readQueue().length - 1);
+    if (opts?.onProgress) opts.onProgress(fullQueue.length - 1);
     // small pause between items
     await delay(200);
   }
 
-  writeQueue(remainingAfter);
+  // merge remainingAfter (retries) with ineligible (not yet due)
+  const finalQueue = remainingAfter.concat(ineligible);
+  writeQueue(finalQueue);
 };
 
 export const clearQueue = () => {
