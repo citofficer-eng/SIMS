@@ -28,11 +28,14 @@ import { processQueue } from './utils/syncQueue';
 
 function App() {
   React.useEffect(() => {
-    // Attempt to flush any queued offline actions on app start and when coming online
+    // Attempt to flush any queued offline actions on app start, on reconnect, on focus, and periodically
     processQueue();
     const onOnline = () => processQueue();
+    const onFocus = () => processQueue();
     window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
+    window.addEventListener('focus', onFocus);
+    const interval = setInterval(() => processQueue(), 60_000);
+    return () => { window.removeEventListener('online', onOnline); window.removeEventListener('focus', onFocus); clearInterval(interval); };
   }, []);
   return (
     <ThemeProvider>

@@ -36,6 +36,18 @@ export const enqueue = (type: SyncAction['type'], payload: any) => {
   writeQueue(q);
 };
 
+export const getQueue = (): SyncAction[] => {
+  return readQueue();
+};
+
+export const getQueueStats = () => {
+  const q = readQueue();
+  const pending = q.length;
+  const nextTimes = q.map(a => a.nextAttemptAt ? new Date(a.nextAttemptAt).getTime() : Infinity).filter(Boolean);
+  const nextAttemptAt = nextTimes.length ? new Date(Math.min(...nextTimes)).toISOString() : null;
+  return { pending, nextAttemptAt };
+};
+
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 const MAX_ATTEMPTS = 6;
