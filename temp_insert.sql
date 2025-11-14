@@ -1,0 +1,1 @@
+INSERT INTO users (first_name,last_name,email,password_hash,role,avatar,student_id,created_at) VALUES ('Rivera','Benlor','riverabenlor461@mail.com', '$2y$10$rUamOxeHt.38lC6Og8imaukbAg4yiABdGuYHdjgfgSNXpV8dmOmMa', 'user', 'https://i.pravatar.cc/150', '2025-0001', NOW());

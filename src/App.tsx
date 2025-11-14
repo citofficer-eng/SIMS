@@ -23,6 +23,7 @@ import Rules from './pages/Rules.tsx';
 import CompleteProfile from './pages/CompleteProfile.tsx';
 import Teams from './pages/Teams.tsx';
 import Reports from './pages/Reports.tsx';
+import RealtimeTest from './pages/RealtimeTest.tsx';
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
                         <Route path="events" element={<Events />} />
                         <Route path="rules" element={<Rules />} />
                         <Route path="reports" element={<Reports />} />
+                        <Route path="realtime-test" element={<RealtimeTest />} />
                         <Route path="profile" element={<Profile />} />
                         <Route path="profile/:userId" element={<Profile />} />
                         <Route path="admin" element={<ProtectedRoute roles={[UserRole.ADMIN]}><Admin /></ProtectedRoute>} />
