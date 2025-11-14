@@ -45,16 +45,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser) as User;
-        setUser(parsed);
+    (async () => {
+      setLoading(true);
+      try {
+        const storedUser = localStorage.getItem('user');
+        const token = localStorage.getItem('token');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser) as User;
+          setUser(parsed);
 
-        // Refresh the user from the server (or mock API) so we get up-to-date
-        // profile, role, and team membership. This enables cross-device sync
-        // when a real backend is configured.
-        (async () => {
+          // Try to refresh the user from the server (or mock API)
           try {
             const refreshed = await getCurrentUser();
             if (refreshed) {
@@ -74,14 +74,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.warn('Could not refresh user from server:', err2);
             }
           }
-        })();
+        } else if (token) {
+          // We have a token but no local user; try to fetch current user from backend
+          try {
+            const current = await getCurrentUser();
+            if (current) {
+              setUser(current);
+              localStorage.setItem('user', JSON.stringify(current));
+            }
+          } catch (e) {
+            console.warn('Failed to restore user from token', e);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to parse or restore user from storage", error);
+        localStorage.removeItem('user');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Failed to parse user from localStorage", error);
-      localStorage.removeItem('user');
-    } finally {
-      setLoading(false);
-    }
+    })();
   }, []);
 
   const login = async (email: string, pass: string) => {

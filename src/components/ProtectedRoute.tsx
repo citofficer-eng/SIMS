@@ -10,8 +10,11 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, roles }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
+
+  // While auth state is initializing, avoid redirecting — let the provider restore the session
+  if (loading) return null;
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
