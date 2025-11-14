@@ -24,8 +24,16 @@ import CompleteProfile from './pages/CompleteProfile.tsx';
 import Teams from './pages/Teams.tsx';
 import Reports from './pages/Reports.tsx';
 import RealtimeTest from './pages/RealtimeTest.tsx';
+import { processQueue } from './utils/syncQueue';
 
 function App() {
+  React.useEffect(() => {
+    // Attempt to flush any queued offline actions on app start and when coming online
+    processQueue();
+    const onOnline = () => processQueue();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, []);
   return (
     <ThemeProvider>
       <AuthProvider>

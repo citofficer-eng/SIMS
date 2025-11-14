@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { VisibilitySettings, UserRole, EventCategory } from '../types.ts';
+import { getVisibilitySettings, updateVisibilitySettings } from '../services/api.ts';
 import { useAuth } from '../hooks/useAuth.ts';
 import { AMARANTH_JOKERS_TEAM_ID } from '../constants.ts';
 
@@ -189,14 +190,55 @@ export const VisibilityProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return mergeSettings(storedSettings);
   });
 
+  // On mount, attempt to fetch settings from backend (or mock API). This ensures
+  // settings persist across devices and sessions. Falls back to localStorage defaults.
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const remote = await getVisibilitySettings();
+        if (!mounted) return;
+        // Merge remote with defaults to handle missing keys/migrations
+        const merged = mergeSettings(JSON.stringify(remote));
+        setSettingsState(merged);
+        // Persist locally so other tabs/devices can pick it up via storage events
+        localStorage.setItem(STORAGE_KEY_VISIBILITY, JSON.stringify(merged));
+      } catch (err) {
+        // If fetching fails, keep local settings
+        console.warn('Failed to fetch visibility settings from server, using local settings.', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   const { user } = useAuth();
 
   const isPrivileged = user?.role === UserRole.ADMIN || user?.teamId === AMARANTH_JOKERS_TEAM_ID;
 
-  const setSettings = (newSettings: VisibilitySettings) => {
+    const setSettings = (newSettings: VisibilitySettings) => {
+    // Update local state & storage immediately for instant UI feedback
     localStorage.setItem(STORAGE_KEY_VISIBILITY, JSON.stringify(newSettings));
+    // store a timestamp so we have a lightweight last-write indicator
+    try { localStorage.setItem(`${STORAGE_KEY_VISIBILITY}_ts`, new Date().toISOString()); } catch {}
     setSettingsState(newSettings);
     window.dispatchEvent(new CustomEvent(STORAGE_EVENT_KEY, { detail: { key: STORAGE_KEY_VISIBILITY } }));
+
+    // Enqueue for background sync so devices that are offline will flush later.
+    try {
+      import('../utils/syncQueue').then(({ enqueue, processQueue }) => {
+        enqueue('visibility:update', newSettings);
+        // Also log activity for auditing
+        enqueue('activity:log', { userId: (user && user.id) || 'unknown', action: 'updated_visibility_settings' });
+        // Kickoff a background process (best-effort)
+        processQueue();
+      }).catch(() => {
+        // If dynamic import fails, fallback to direct save
+        updateVisibilitySettings(newSettings).catch(e => console.error('Failed to save visibility settings to server:', e));
+      });
+    } catch (err) {
+      // If queue fails synchronously, fallback to direct save (best-effort)
+      updateVisibilitySettings(newSettings).catch(e => console.error('Failed to save visibility settings to server:', e));
+    }
   };
 
   useEffect(() => {

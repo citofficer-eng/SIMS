@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth.ts';
 import { useToast } from '../hooks/useToast.ts';
 import { useSyncedData } from '../hooks/useSyncedData.ts';
 import { getRules, updateRules, STORAGE_KEYS, UserRole } from '../services/api.ts';
+import { enqueue, processQueue } from '../utils/syncQueue';
 import { RulesData, RuleSection, RuleItem } from '../types.ts';
 import Skeleton from '../components/Skeleton.tsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,7 +24,14 @@ const Rules: React.FC = () => {
             await updateRules(updatedRules);
             addToast('Rules updated successfully!', 'success');
         } catch (error) {
-            addToast('Failed to update rules', 'error');
+            // If saving failed (offline or server issue), enqueue for later sync
+            try {
+                enqueue('rules:update', updatedRules);
+                processQueue();
+                addToast('Rules update queued — will sync when online.', 'info');
+            } catch (e) {
+                addToast('Failed to update rules', 'error');
+            }
         }
     };
 

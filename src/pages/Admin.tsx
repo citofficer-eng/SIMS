@@ -328,8 +328,17 @@ const ToggleSwitch: React.FC<{ id: string; label: string; checked: boolean; onCh
     <label htmlFor={id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors">
         <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</span>
         <div className="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id={id} className="sr-only peer" checked={checked} onChange={onChange} />
-            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+            <input
+                type="checkbox"
+                id={id}
+                className="sr-only peer"
+                checked={checked}
+                onChange={onChange}
+                aria-checked={checked}
+            />
+            <div className="w-11 h-6 rounded-full bg-slate-200 dark:bg-slate-700 peer-checked:bg-indigo-600 transition-colors duration-150 relative peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 peer-focus:ring-offset-2 dark:peer-focus:ring-indigo-800">
+                <span className="absolute left-[2px] top-0.5 h-5 w-5 bg-white rounded-full border border-slate-300 dark:border-slate-600 transform transition-transform duration-150 peer-checked:translate-x-5"></span>
+            </div>
         </div>
     </label>
 );

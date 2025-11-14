@@ -32,6 +32,10 @@ const Dashboard: React.FC = () => {
         return getSortedTeamsWithRanks(filtered);
     }, [leaderboardData]);
 
+    const totalPoints = useMemo(() => {
+        return (competingTeams || []).reduce((sum, t) => sum + (t.score || 0), 0);
+    }, [competingTeams]);
+
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -126,6 +130,9 @@ const Dashboard: React.FC = () => {
                     const teamStyle = getTeamStyles(team.id);
                     const trendType = getTrendType(percentageChange);
 
+                    const shareOfTotal = totalPoints > 0 ? (team.score / totalPoints) * 100 : 0;
+                    const shareText = `${shareOfTotal.toFixed(1)}%`;
+
                     return (
                         <Card key={team.id} className="p-5 transform transition-transform hover:-translate-y-1">
                             <div className="flex justify-between items-start">
@@ -135,8 +142,13 @@ const Dashboard: React.FC = () => {
 
                             <div className="flex items-baseline justify-between mt-3 mb-2">
                                 <h4 className="font-bold text-2xl text-slate-800 dark:text-slate-100 mb-0">{team.score} Pts</h4>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-3">
                                     <div className="flex flex-col items-end">
+                                        <span className="text-xs text-slate-500 dark:text-slate-400">Share of total</span>
+                                        <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{shareText}</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-xs text-slate-500 dark:text-slate-400">Change</span>
                                         <span className={`font-semibold text-sm ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
                                             {percentageChange !== 0 ? (isPositive ? '+' : '') + Math.abs(percentageChange).toFixed(1) + '%' : '0%'}
                                         </span>

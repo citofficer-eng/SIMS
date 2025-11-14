@@ -7,6 +7,7 @@ import { getEvents, getLeaderboard, getUsers, STORAGE_KEYS } from '../services/a
 import { Team, Event, User } from '../types.ts';
 import { useSyncedData } from '../hooks/useSyncedData.ts';
 import { motion } from 'framer-motion';
+import ConnectionStatus from './ConnectionStatus';
 
 const HamburgerIcon: React.FC<{ isOpen: boolean }> = ({ isOpen }) => (
     <svg
@@ -177,9 +178,12 @@ const Header: React.FC<{ onToggleSidebar: () => void, sidebarOpen: boolean }> = 
           </div>
         </div>
 
-        <div className={`hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm transition-all duration-300 ${isLive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 shadow-md shadow-green-500/20' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
-            <span className={`h-2.5 w-2.5 rounded-full transition-colors ${isLive ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`}></span>
-            <span className="font-semibold">{isLive ? 'Live Sync' : 'Real-time'}</span>
+        <div className="hidden lg:flex items-center space-x-4">
+            <div className={`hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm transition-all duration-300 ${isLive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 shadow-md shadow-green-500/20' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                <span className={`h-2.5 w-2.5 rounded-full transition-colors ${isLive ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                <span className="font-semibold">{isLive ? 'Live Sync' : 'Real-time'}</span>
+            </div>
+            <ConnectionStatus />
         </div>
 
         <div className="flex items-center gap-3">

@@ -61,7 +61,10 @@ const mockApi = {
     login: (email: string, pass: string): Promise<User> => new Promise((resolve, reject) => {
         setTimeout(() => {
             const user = Object.values(usersStore).find(u => u.email.toLowerCase() === email.toLowerCase());
-            if (user && user.password === pass) resolve(user);
+            if (user && user.password === pass) {
+                try { localStorage.setItem('token', 'mock-jwt-token'); } catch {}
+                resolve(user);
+            }
             else if (user) reject(new Error('Invalid credentials'));
             else reject(new Error('User not found'));
         }, 300);
@@ -73,6 +76,7 @@ const mockApi = {
             const mockEmail = "new.user@google.com";
             const existingUser = Object.values(usersStore).find(u => u.email.toLowerCase() === mockEmail);
             if (existingUser) {
+                try { localStorage.setItem('token', 'mock-jwt-token'); } catch {}
                 resolve({ user: existingUser, isNew: false });
             } else {
                 const partialUser: User = {
@@ -84,6 +88,7 @@ const mockApi = {
                     role: UserRole.USER,
                     avatar: `https://robohash.org/${mockEmail}.png`
                 };
+                try { localStorage.setItem('token', 'mock-jwt-token'); } catch {}
                 resolve({ user: partialUser, isNew: true });
             }
         }, 300);
@@ -111,6 +116,7 @@ const mockApi = {
             } as User;
             usersStore[newUser.id] = newUser;
             setStoredData(STORAGE_KEYS.USERS, usersStore);
+            try { localStorage.setItem('token', 'mock-jwt-token'); } catch {}
             resolve({ user: newUser, token: "mock-jwt-token" });
         }, 300);
     }),
@@ -400,6 +406,28 @@ export const register = async (userData: Partial<User>): Promise<User> => {
       }
     }
 };
+export const getCurrentUser = async (): Promise<User | null> => {
+    if (API_BASE === '/mock') {
+        try {
+            const stored = localStorage.getItem('user');
+            if (!stored) return null;
+            const parsed = JSON.parse(stored) as User;
+            // find fresh copy in mock store
+            const all = Object.values(getStoredData(STORAGE_KEYS.USERS, {} as any));
+            const found = all.find((u: any) => u.id === parsed.id) || parsed;
+            return found as User;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    try {
+        return await apiFetch<User>('/auth/me.php');
+    } catch (e) {
+        console.warn('getCurrentUser failed', e);
+        return null;
+    }
+};
 export const getUsers = (): Promise<User[]> => 
   API_BASE === '/mock' ? mockApi.getUsers() : withMockFallback(
     () => apiFetch<User[]>('/users/get.php'),
@@ -438,6 +466,15 @@ export const updateReportStatus = (reportId: string, status: Report['status']): 
 export const addReportReply = (reportId: string, reply: { reply: string }): Promise<void> => API_BASE === '/mock' ? mockApi.addReportReply(reportId, reply) : apiFetch<void>(`/reports/reply.php?id=${reportId}`, { method: 'POST', body: JSON.stringify(reply) });
 export const getVisibilitySettings = (): Promise<VisibilitySettings> => API_BASE === '/mock' ? mockApi.getVisibilitySettings() : apiFetch<VisibilitySettings>('/system/settings.php');
 export const updateVisibilitySettings = (settings: VisibilitySettings): Promise<void> => API_BASE === '/mock' ? mockApi.updateVisibilitySettings(settings) : apiFetch<void>('/system/settings.php', { method: 'PUT', body: JSON.stringify(settings) });
+export const pingServer = async (): Promise<boolean> => {
+    if (API_BASE === '/mock') return Promise.resolve(true);
+    try {
+        await apiFetch<void>('/system/ping.php');
+        return true;
+    } catch (e) {
+        return false;
+    }
+};
 export const getRules = (): Promise<RulesData> => API_BASE === '/mock' ? mockApi.getRules() : apiFetch<RulesData>('/system/rules.php');
 export const updateRules = (rulesData: RulesData): Promise<void> => API_BASE === '/mock' ? mockApi.updateRules(rulesData) : apiFetch<void>('/system/rules.php', { method: 'PUT', body: JSON.stringify(rulesData) });
 export { STORAGE_KEYS, UserRole };

@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types.ts';
-import { login as apiLogin, register as apiRegister, loginWithGoogle as apiLoginWithGoogle, completeUserProfile, logActivity } from '../services/api.ts';
+import { login as apiLogin, register as apiRegister, loginWithGoogle as apiLoginWithGoogle, completeUserProfile, logActivity, getUsers } from '../services/api.ts';
 
 interface AuthContextType {
   user: User | null;
@@ -48,7 +48,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const parsed = JSON.parse(storedUser) as User;
+        setUser(parsed);
+
+        // Refresh the user from the server (or mock API) so we get up-to-date
+        // profile, role, and team membership. This enables cross-device sync
+        // when a real backend is configured. Prefer a dedicated 'me' endpoint if available.
+        (async () => {
+          try {
+            // try to import getCurrentUser dynamically (if present)
+            let refreshed = null as User | null;
+            try {
+              const mod = await import('../services/api');
+              if (typeof mod.getCurrentUser === 'function') {
+                refreshed = await mod.getCurrentUser();
+              }
+            } catch (e) {
+              // fallback to scanning all users
+              try {
+                const all = await getUsers();
+                refreshed = all.find(u => u.id === parsed.id) || null;
+              } catch (err) {
+                console.warn('Could not refresh user from server (fallback):', err);
+              }
+            }
+
+            if (refreshed) {
+              setUser(refreshed);
+              localStorage.setItem('user', JSON.stringify(refreshed));
+            }
+          } catch (err) {
+            console.warn('Could not refresh user from server:', err);
+          }
+        })();
       }
     } catch (error) {
       console.error("Failed to parse user from localStorage", error);
