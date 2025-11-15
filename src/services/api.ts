@@ -113,7 +113,16 @@ const writeToFirebaseData = async <T>(path: string, data: T): Promise<void> => {
         if (!db) return Promise.resolve();
         const { ref, set } = await import('firebase/database');
         const dbRef = ref(db, path);
-        return set(dbRef, data);
+        // Firebase Realtime Database does not accept `undefined` values.
+        // Serialize through JSON to strip undefined and produce a safe payload.
+        let safe: any;
+        try {
+            safe = JSON.parse(JSON.stringify(data));
+        } catch (e) {
+            // fallback: attempt shallow copy
+            safe = data as any;
+        }
+        return set(dbRef, safe);
     } catch (e) {
         console.warn('Firebase write failed for', path, e);
         return Promise.resolve();
@@ -561,7 +570,16 @@ export const getLeaderboard = async (): Promise<Team[]> => {
     if (API_BASE === 'firebase') {
         const snap = await getOnceFromFirebase('teams');
         if (!snap) return [];
-        const teams = Object.values(snap) as Team[];
+        const teams = (Object.values(snap) as Team[]).map(t => ({
+            ...t,
+            progressHistory: (t as any).progressHistory || [],
+            detailedProgressHistory: (t as any).detailedProgressHistory || [],
+            merits: (t as any).merits || [],
+            demerits: (t as any).demerits || [],
+            score: (t as any).score || 0,
+        }));
+        // keep stable ordering (by score desc)
+        teams.sort((a, b) => (b.score || 0) - (a.score || 0));
         return teams;
     }
     return withMockFallback(
@@ -575,7 +593,18 @@ export const getEvents = async (): Promise<Event[]> => {
     if (API_BASE === 'firebase') {
         const snap = await getOnceFromFirebase('events');
         if (!snap) return [];
-        return Object.values(snap) as Event[];
+        const events = (Object.values(snap) as Event[]).map(e => ({
+            ...e,
+            startDate: (e as any).startDate || (e as any).date || null,
+            status: (e as any).status || null,
+        }));
+        // Sort upcoming first by startDate (descending most recent first)
+        events.sort((a, b) => {
+            const ta = a.startDate ? new Date(a.startDate).getTime() : 0;
+            const tb = b.startDate ? new Date(b.startDate).getTime() : 0;
+            return tb - ta;
+        });
+        return events;
     }
     return withMockFallback(
         () => apiFetch<Event[]>('/events/get.php'),
@@ -694,7 +723,10 @@ export const addPointLog = (log: { teamId: string, type: 'merit' | 'demerit', re
 export const deletePointLog = (logId: string): Promise<void> => API_BASE === '/mock' ? mockApi.deletePointLog(logId) : apiFetch<void>(`/points/delete.php?id=${logId}`, { method: 'DELETE' });
 export const updatePointLog = (logId: string, updatedLog: Partial<PointLog> & { teamId: string }): Promise<void> => API_BASE === '/mock' ? mockApi.updatePointLog(logId, updatedLog) : apiFetch<void>(`/points/update.php?id=${logId}`, { method: 'PUT', body: JSON.stringify({ team_id: updatedLog.teamId, reason: updatedLog.reason, points: updatedLog.points }) });
 export const getJoinRequests = async (teamId: string): Promise<JoinRequest[]> => {
-    if (API_BASE === '/mock') return mockApi.getJoinRequests ? mockApi.getJoinRequests(teamId) : [];
+    if (API_BASE === '/mock') {
+        const team = teamsStore.find(t => t.id === teamId) as any;
+        return (team && team.joinRequests) ? team.joinRequests : [];
+    }
     if (API_BASE === 'firebase') {
         try {
             const snap = await getOnceFromFirebase(`teams/${teamId}/joinRequests`);
@@ -809,8 +841,19 @@ export const pingServer = async (): Promise<boolean> => {
         return false;
     }
 };
-export const getRules = (): Promise<RulesData> => API_BASE === '/mock' ? mockApi.getRules() : apiFetch<RulesData>('/system/rules.php');
-export const updateRules = (rulesData: RulesData): Promise<void> => API_BASE === '/mock' ? mockApi.updateRules(rulesData) : apiFetch<void>('/system/rules.php', { method: 'PUT', body: JSON.stringify(rulesData) });
+export const getRules = async (): Promise<RulesData> => {
+    if (API_BASE === '/mock') return mockApi.getRules();
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('rules');
+        return (snap as RulesData) || (await mockApi.getRules());
+    }
+    return apiFetch<RulesData>('/system/rules.php');
+};
+export const updateRules = async (rulesData: RulesData): Promise<void> => {
+    if (API_BASE === '/mock') return mockApi.updateRules(rulesData);
+    if (API_BASE === 'firebase') return writeToFirebaseData('rules', rulesData);
+    return apiFetch<void>('/system/rules.php', { method: 'PUT', body: JSON.stringify(rulesData) });
+};
 export { STORAGE_KEYS, UserRole, subscribeToFirebaseData, writeToFirebaseData, firebaseListeners };
 
 // Track last-received timestamps per firebase path
