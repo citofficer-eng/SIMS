@@ -582,13 +582,88 @@ export const getEvents = async (): Promise<Event[]> => {
         () => mockApi.getEvents()
     );
 };
-export const addEvent = (eventData: Partial<Event>): Promise<Event> => API_BASE === '/mock' ? mockApi.addEvent(eventData) : apiFetch<Event>('/events/create.php', { method: 'POST', body: JSON.stringify(eventData) });
-export const updateEvent = (eventData: Event): Promise<Event> => API_BASE === '/mock' ? mockApi.updateEvent(eventData) : apiFetch<Event>(`/events/update.php?id=${eventData.id}`, { method: 'PUT', body: JSON.stringify(eventData) });
-export const deleteEvent = (eventId: string): Promise<void> => API_BASE === '/mock' ? mockApi.deleteEvent(eventId) : apiFetch<void>(`/events/delete.php?id=${eventId}`, { method: 'DELETE' });
-export const updateEventResults = (eventId: string, results: EventResult[]): Promise<Event> => API_BASE === '/mock' ? mockApi.updateEventResults(eventId, results) : apiFetch<Event>(`/events/results.php?id=${eventId}`, { method: 'PUT', body: JSON.stringify({ results }) });
-export const getNotifications = (): Promise<AppNotification[]> => API_BASE === '/mock' ? mockApi.getNotifications() : apiFetch<AppNotification[]>('/system/notifications.php');
+export const addEvent = async (eventData: Partial<Event>): Promise<Event> => {
+    if (API_BASE === '/mock') return mockApi.addEvent(eventData);
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('events');
+        const events = (snap ? Object.values(snap) : []) as Event[];
+        const newEvent: Event = { id: `evt_${Date.now()}`, ...eventData } as Event;
+        events.push(newEvent);
+        await writeToFirebaseData('events', events).catch(e => console.warn('Firebase addEvent failed', e));
+        setStoredData(STORAGE_KEYS.EVENTS, events);
+        return newEvent;
+    }
+    return apiFetch<Event>('/events/create.php', { method: 'POST', body: JSON.stringify(eventData) });
+};
+export const updateEvent = async (eventData: Event): Promise<Event> => {
+    if (API_BASE === '/mock') return mockApi.updateEvent(eventData);
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('events');
+        const events = (snap ? Object.values(snap) : []) as Event[];
+        const idx = events.findIndex(e => e.id === eventData.id);
+        if (idx === -1) throw new Error('Event not found');
+        events[idx] = { ...events[idx], ...eventData };
+        await writeToFirebaseData('events', events).catch(e => console.warn('Firebase updateEvent failed', e));
+        setStoredData(STORAGE_KEYS.EVENTS, events);
+        return events[idx];
+    }
+    return apiFetch<Event>(`/events/update.php?id=${eventData.id}`, { method: 'PUT', body: JSON.stringify(eventData) });
+};
+export const deleteEvent = async (eventId: string): Promise<void> => {
+    if (API_BASE === '/mock') return mockApi.deleteEvent(eventId);
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('events');
+        const events = (snap ? Object.values(snap) : []) as Event[];
+        const filtered = events.filter(e => e.id !== eventId);
+        await writeToFirebaseData('events', filtered).catch(e => console.warn('Firebase deleteEvent failed', e));
+        setStoredData(STORAGE_KEYS.EVENTS, filtered);
+        return;
+    }
+    return apiFetch<void>(`/events/delete.php?id=${eventId}`, { method: 'DELETE' });
+};
+export const updateEventResults = async (eventId: string, results: EventResult[]): Promise<Event> => {
+    if (API_BASE === '/mock') return mockApi.updateEventResults(eventId, results);
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('events');
+        const events = (snap ? Object.values(snap) : []) as Event[];
+        const idx = events.findIndex(e => e.id === eventId);
+        if (idx === -1) throw new Error('Event not found');
+        const event = events[idx];
+        event.results = results;
+        event.status = EventStatus.COMPLETED;
+        // NOTE: complex score calculation may be required here; mimic mock behavior partially
+        events[idx] = event;
+        await writeToFirebaseData('events', events).catch(e => console.warn('Firebase updateEventResults failed', e));
+        setStoredData(STORAGE_KEYS.EVENTS, events);
+        // Optionally update teams if logic present elsewhere
+        return event;
+    }
+    return apiFetch<Event>(`/events/results.php?id=${eventId}`, { method: 'PUT', body: JSON.stringify({ results }) });
+};
+export const getNotifications = async (): Promise<AppNotification[]> => {
+    if (API_BASE === '/mock') return mockApi.getNotifications();
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('notifications');
+        if (!snap) return [];
+        return (Object.values(snap) as AppNotification[]);
+    }
+    return apiFetch<AppNotification[]>('/system/notifications.php');
+};
 export const logActivity = async (userId: string, action: string, target?: Activity['target']): Promise<void> => {
     if (API_BASE === '/mock') return mockApi.logActivity(userId, action, target);
+    if (API_BASE === 'firebase') {
+        try {
+            const entry: Activity = { id: `act_${Date.now()}`, userId, action, target, timestamp: new Date().toISOString() } as Activity;
+            const snap = await getOnceFromFirebase('activities');
+            const list = (snap ? Object.values(snap) : []) as Activity[];
+            list.unshift(entry);
+            if (list.length > 500) list.length = 500;
+            await writeToFirebaseData('activities', list).catch(e => console.warn('Firebase logActivity failed', e));
+        } catch (e) {
+            console.warn('logActivity firebase branch failed', e);
+        }
+        return Promise.resolve();
+    }
     try {
         return await apiFetch<void>('/activities/index.php', { method: 'POST', body: JSON.stringify({ userId, action, target }) });
     } catch (e) {
@@ -599,6 +674,15 @@ export const logActivity = async (userId: string, action: string, target?: Activ
 };
 export const getAuditLogs = async (): Promise<Activity[]> => {
     if (API_BASE === '/mock') return mockApi.getActivities();
+    if (API_BASE === 'firebase') {
+        try {
+            const snap = await getOnceFromFirebase('activities');
+            return (snap ? Object.values(snap) as Activity[] : []);
+        } catch (e) {
+            console.warn('getAuditLogs firebase failed', e);
+            return [];
+        }
+    }
     try {
         return await apiFetch<Activity[]>('/activities/index.php');
     } catch (e) {
@@ -609,12 +693,96 @@ export const getAuditLogs = async (): Promise<Activity[]> => {
 export const addPointLog = (log: { teamId: string, type: 'merit' | 'demerit', reason: string, points: number }): Promise<void> => API_BASE === '/mock' || API_BASE === 'firebase' ? mockApi.addPointLog(log) : apiFetch<void>('/points/index.php', { method: 'POST', body: JSON.stringify(log) });
 export const deletePointLog = (logId: string): Promise<void> => API_BASE === '/mock' ? mockApi.deletePointLog(logId) : apiFetch<void>(`/points/delete.php?id=${logId}`, { method: 'DELETE' });
 export const updatePointLog = (logId: string, updatedLog: Partial<PointLog> & { teamId: string }): Promise<void> => API_BASE === '/mock' ? mockApi.updatePointLog(logId, updatedLog) : apiFetch<void>(`/points/update.php?id=${logId}`, { method: 'PUT', body: JSON.stringify({ team_id: updatedLog.teamId, reason: updatedLog.reason, points: updatedLog.points }) });
-export const getJoinRequests = (teamId: string): Promise<JoinRequest[]> => apiFetch<JoinRequest[]>(`/teams/join_requests.php?teamId=${teamId}`);
-export const requestToJoinTeam = (teamId: string): Promise<void> => API_BASE === '/mock' ? mockApi.requestToJoinTeam(teamId) : apiFetch<void>('/teams/join_requests.php', { method: 'POST', body: JSON.stringify({ teamId }) });
-export const manageJoinRequest = (teamId: string, userId: string, action: 'accepted' | 'rejected'): Promise<void> => API_BASE === '/mock' ? mockApi.manageJoinRequest(teamId, userId, action) : apiFetch<void>(`/teams/join_requests.php`, { method: 'PUT', body: JSON.stringify({ teamId, userId, status: action }) });
-export const removeUserFromTeam = (userId: string): Promise<void> => API_BASE === '/mock' ? mockApi.removeUserFromTeam(userId) : apiFetch<void>('/teams/members.php', { method: 'DELETE', body: `userId=${encodeURIComponent(userId)}`});
-export const updateTeamRoster = (teamId: string, eventId: string, participants: string[]): Promise<void> => API_BASE === '/mock' ? mockApi.updateTeamRoster(teamId, eventId, participants) : apiFetch(`/teams/update.php?id=${teamId}`, { method: 'PUT', body: JSON.stringify({ rosters: [{ eventId, participants }] }) });
-export const getTeamUsers = (teamId: string): Promise<User[]> => API_BASE === '/mock' ? mockApi.getTeamUsers(teamId) : apiFetch<User[]>(`/teams/members.php?teamId=${teamId}`);
+export const getJoinRequests = async (teamId: string): Promise<JoinRequest[]> => {
+    if (API_BASE === '/mock') return mockApi.getJoinRequests ? mockApi.getJoinRequests(teamId) : [];
+    if (API_BASE === 'firebase') {
+        try {
+            const snap = await getOnceFromFirebase(`teams/${teamId}/joinRequests`);
+            return snap ? Object.values(snap) as JoinRequest[] : [];
+        } catch (e) {
+            console.warn('getJoinRequests firebase failed', e);
+            return [];
+        }
+    }
+    return apiFetch<JoinRequest[]>(`/teams/join_requests.php?teamId=${teamId}`);
+};
+export const requestToJoinTeam = async (teamId: string): Promise<void> => {
+    if (API_BASE === '/mock') return mockApi.requestToJoinTeam(teamId);
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase(`teams/${teamId}`);
+        const team = snap as any;
+        const joinRequests = team?.joinRequests ? Object.values(team.joinRequests) as JoinRequest[] : [];
+        // Simulate a request from current user (best-effort)
+        const newReq: JoinRequest = { id: `req_${Date.now()}`, userId: 'current_user', timestamp: new Date().toISOString() } as JoinRequest;
+        joinRequests.push(newReq);
+        await writeToFirebaseData(`teams/${teamId}/joinRequests`, joinRequests).catch(e => console.warn('requestToJoinTeam firebase failed', e));
+        return;
+    }
+    return apiFetch<void>('/teams/join_requests.php', { method: 'POST', body: JSON.stringify({ teamId }) });
+};
+export const manageJoinRequest = async (teamId: string, userId: string, action: 'accepted' | 'rejected'): Promise<void> => {
+    if (API_BASE === '/mock') return mockApi.manageJoinRequest(teamId, userId, action);
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase(`teams/${teamId}`);
+        const team = snap as any || {};
+        const joinRequests = team.joinRequests ? Object.values(team.joinRequests) as JoinRequest[] : [];
+        const filtered = joinRequests.filter(r => r.userId !== userId);
+        await writeToFirebaseData(`teams/${teamId}/joinRequests`, filtered).catch(e => console.warn('manageJoinRequest firebase failed', e));
+        if (action === 'accepted') {
+            // add user's teamId in users node
+            const usersSnap = await getOnceFromFirebase('users');
+            const users = usersSnap || {};
+            for (const k of Object.keys(users)) {
+                if ((users as any)[k].id === userId) {
+                    (users as any)[k].teamId = teamId;
+                    break;
+                }
+            }
+            await writeToFirebaseData('users', users).catch(e => console.warn('manageJoinRequest write users failed', e));
+        }
+        return;
+    }
+    return apiFetch<void>(`/teams/join_requests.php`, { method: 'PUT', body: JSON.stringify({ teamId, userId, status: action }) });
+};
+export const removeUserFromTeam = async (userId: string): Promise<void> => {
+    if (API_BASE === '/mock') return mockApi.removeUserFromTeam(userId);
+    if (API_BASE === 'firebase') {
+        const usersSnap = await getOnceFromFirebase('users');
+        const users = usersSnap || {};
+        for (const k of Object.keys(users)) {
+            if ((users as any)[k].id === userId) {
+                (users as any)[k].teamId = undefined;
+                break;
+            }
+        }
+        await writeToFirebaseData('users', users).catch(e => console.warn('removeUserFromTeam firebase failed', e));
+        return;
+    }
+    return apiFetch<void>('/teams/members.php', { method: 'DELETE', body: `userId=${encodeURIComponent(userId)}`});
+};
+export const updateTeamRoster = async (teamId: string, eventId: string, participants: string[]): Promise<void> => {
+    if (API_BASE === '/mock') return mockApi.updateTeamRoster(teamId, eventId, participants);
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase(`teams/${teamId}`);
+        const team = snap as any || {};
+        team.rosters = team.rosters || [];
+        const idx = (team.rosters as any[]).findIndex((r: any) => r.eventId === eventId);
+        if (idx > -1) team.rosters[idx].participants = participants;
+        else team.rosters.push({ eventId, participants });
+        await writeToFirebaseData(`teams/${teamId}`, team).catch(e => console.warn('updateTeamRoster firebase failed', e));
+        return;
+    }
+    return apiFetch(`/teams/update.php?id=${teamId}`, { method: 'PUT', body: JSON.stringify({ rosters: [{ eventId, participants }] }) });
+};
+export const getTeamUsers = async (teamId: string): Promise<User[]> => {
+    if (API_BASE === '/mock') return mockApi.getTeamUsers(teamId);
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('users');
+        const usersObj = snap || {};
+        return Object.values(usersObj).filter((u: any) => u.teamId === teamId) as User[];
+    }
+    return apiFetch<User[]>(`/teams/members.php?teamId=${teamId}`);
+};
 export const getReports = (): Promise<Report[]> => API_BASE === '/mock' ? mockApi.getReports() : apiFetch<Report[]>('/reports/index.php');
 export const submitReport = (reportData: any): Promise<void> => API_BASE === '/mock' ? mockApi.submitReport(reportData) : apiFetch<void>('/reports/index.php', { method: 'POST', body: JSON.stringify(reportData) });
 export const updateReportStatus = (reportId: string, status: Report['status']): Promise<void> => API_BASE === '/mock' ? mockApi.updateReportStatus(reportId, status) : apiFetch<void>(`/reports/status_update.php?id=${reportId}`, { method: 'PUT', body: JSON.stringify({ status }) });
