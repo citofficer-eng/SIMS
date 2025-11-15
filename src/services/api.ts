@@ -32,11 +32,11 @@ const setStoredData = <T>(key: string, data: T) => {
     window.dispatchEvent(new CustomEvent('storage-update', { detail: { key } }));
 };
 
-// Firebase DB helper
-const getFirebaseDB = () => {
+// Firebase DB helper (browser-safe dynamic import)
+const getFirebaseDB = async () => {
     try {
-        const { initFirebase } = require('./firebase');
-        const db = initFirebase();
+        const mod = await import('./firebase');
+        const db = mod.initFirebase();
         if (db) {
             console.log('[Firebase] Database initialized successfully');
         } else {
@@ -51,9 +51,9 @@ const getFirebaseDB = () => {
 
 const getOnceFromFirebase = async <T>(path: string): Promise<T | null> => {
     try {
-        const db = getFirebaseDB();
+        const db = await getFirebaseDB();
         if (!db) return null;
-        const { ref, get } = require('firebase/database');
+        const { ref, get } = await import('firebase/database');
         const dbRef = ref(db, path);
         const snap = await get(dbRef);
         return snap.exists() ? snap.val() : null;
@@ -64,41 +64,54 @@ const getOnceFromFirebase = async <T>(path: string): Promise<T | null> => {
 };
 
 const subscribeToFirebaseData = <T>(path: string, callback: (data: T) => void): (() => void) => {
-    try {
-        const db = getFirebaseDB();
-        if (!db) {
-            console.error(`[Firebase] DB not initialized for subscription to ${path}`);
-            return () => {};
-        }
-        const { ref, onValue, off } = require('firebase/database');
-        const dbRef = ref(db, path);
-        console.log(`[Firebase] Subscribing to path: ${path}`);
-        onValue(dbRef, (snapshot: any) => {
-            if (snapshot.exists()) {
-                const val = snapshot.val();
-                console.log(`[Firebase] Data received for ${path}:`, val);
-                callback(val);
-                try { lastReceivedTimestamps[path] = new Date().toISOString(); } catch (e) {}
-            } else {
-                console.warn(`[Firebase] No data exists at path: ${path}`);
+    let cancelled = false;
+    let unsubscribeFn: () => void = () => { cancelled = true; };
+
+    (async () => {
+        try {
+            const db = await getFirebaseDB();
+            if (!db) {
+                console.error(`[Firebase] DB not initialized for subscription to ${path}`);
+                return;
             }
-        }, (error: any) => {
-            console.error(`[Firebase] Subscription error for ${path}:`, error);
-        });
-        const unsubscribe = () => { try { off(dbRef); } catch (e) {} };
-        firebaseListeners.set(path, unsubscribe);
-        return unsubscribe;
-    } catch (e) {
-        console.error(`[Firebase] Subscription failed for ${path}:`, e);
-        return () => {};
-    }
+            const { ref, onValue, off } = await import('firebase/database');
+            const dbRef = ref(db, path);
+            console.log(`[Firebase] Subscribing to path: ${path}`);
+            const listener = (snapshot: any) => {
+                if (snapshot.exists()) {
+                    const val = snapshot.val();
+                    console.log(`[Firebase] Data received for ${path}:`, val);
+                    callback(val);
+                    try { lastReceivedTimestamps[path] = new Date().toISOString(); } catch (e) {}
+                } else {
+                    console.warn(`[Firebase] No data exists at path: ${path}`);
+                }
+            };
+            onValue(dbRef, listener, (error: any) => {
+                console.error(`[Firebase] Subscription error for ${path}:`, error);
+            });
+            unsubscribeFn = () => { try { off(dbRef, 'value', listener); } catch (e) {} };
+            if (cancelled) {
+                // If unsubscribed before listener attached, clean up immediately
+                unsubscribeFn();
+            }
+            firebaseListeners.set(path, unsubscribeFn);
+        } catch (e) {
+            console.error(`[Firebase] Subscription failed for ${path}:`, e);
+        }
+    })();
+
+    return () => {
+        cancelled = true;
+        try { unsubscribeFn(); } catch (e) {}
+    };
 };
 
 const writeToFirebaseData = async <T>(path: string, data: T): Promise<void> => {
     try {
-        const db = getFirebaseDB();
+        const db = await getFirebaseDB();
         if (!db) return Promise.resolve();
-        const { ref, set } = require('firebase/database');
+        const { ref, set } = await import('firebase/database');
         const dbRef = ref(db, path);
         return set(dbRef, data);
     } catch (e) {
