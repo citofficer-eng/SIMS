@@ -42,6 +42,20 @@ const getFirebaseDB = () => {
     }
 };
 
+const getOnceFromFirebase = async <T>(path: string): Promise<T | null> => {
+    try {
+        const db = getFirebaseDB();
+        if (!db) return null;
+        const { ref, get } = require('firebase/database');
+        const dbRef = ref(db, path);
+        const snap = await get(dbRef);
+        return snap.exists() ? snap.val() : null;
+    } catch (e) {
+        console.warn('Firebase getOnce failed for', path, e);
+        return null;
+    }
+};
+
 const subscribeToFirebaseData = <T>(path: string, callback: (data: T) => void): (() => void) => {
     try {
         const db = getFirebaseDB();
@@ -498,23 +512,45 @@ export const getCurrentUser = async (): Promise<User | null> => {
         return null;
     }
 };
-export const getUsers = (): Promise<User[]> => 
-  API_BASE === '/mock' ? mockApi.getUsers() : withMockFallback(
-    () => apiFetch<User[]>('/users/get.php'),
-    () => mockApi.getUsers()
-  );
+export const getUsers = async (): Promise<User[]> => {
+    if (API_BASE === '/mock') return mockApi.getUsers();
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('users');
+        if (!snap) return [];
+        return Object.values(snap) as User[];
+    }
+    return withMockFallback(
+        () => apiFetch<User[]>('/users/get.php'),
+        () => mockApi.getUsers()
+    );
+};
 export const updateUserRole = (userId: string, role: UserRole): Promise<User> => API_BASE === '/mock' ? mockApi.updateUserRole(userId, role) : apiFetch<User>(`/users/update.php?id=${userId}`, { method: 'PUT', body: JSON.stringify({ role }) });
-export const getLeaderboard = (): Promise<Team[]> => 
-  API_BASE === '/mock' ? mockApi.getLeaderboard() : withMockFallback(
-    () => apiFetch<Team[]>('/teams/get.php'),
-    () => mockApi.getLeaderboard()
-  );
+export const getLeaderboard = async (): Promise<Team[]> => {
+    if (API_BASE === '/mock') return mockApi.getLeaderboard();
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('teams');
+        if (!snap) return [];
+        const teams = Object.values(snap) as Team[];
+        return teams;
+    }
+    return withMockFallback(
+        () => apiFetch<Team[]>('/teams/get.php'),
+        () => mockApi.getLeaderboard()
+    );
+};
 export const updateTeam = (teamData: Partial<Team>): Promise<Team> => API_BASE === '/mock' ? mockApi.updateTeam(teamData) : apiFetch<Team>(`/teams/update.php?id=${teamData.id}`, { method: 'PUT', body: JSON.stringify(teamData) });
-export const getEvents = (): Promise<Event[]> => 
-  API_BASE === '/mock' ? mockApi.getEvents() : withMockFallback(
-    () => apiFetch<Event[]>('/events/get.php'),
-    () => mockApi.getEvents()
-  );
+export const getEvents = async (): Promise<Event[]> => {
+    if (API_BASE === '/mock') return mockApi.getEvents();
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('events');
+        if (!snap) return [];
+        return Object.values(snap) as Event[];
+    }
+    return withMockFallback(
+        () => apiFetch<Event[]>('/events/get.php'),
+        () => mockApi.getEvents()
+    );
+};
 export const addEvent = (eventData: Partial<Event>): Promise<Event> => API_BASE === '/mock' ? mockApi.addEvent(eventData) : apiFetch<Event>('/events/create.php', { method: 'POST', body: JSON.stringify(eventData) });
 export const updateEvent = (eventData: Event): Promise<Event> => API_BASE === '/mock' ? mockApi.updateEvent(eventData) : apiFetch<Event>(`/events/update.php?id=${eventData.id}`, { method: 'PUT', body: JSON.stringify(eventData) });
 export const deleteEvent = (eventId: string): Promise<void> => API_BASE === '/mock' ? mockApi.deleteEvent(eventId) : apiFetch<void>(`/events/delete.php?id=${eventId}`, { method: 'DELETE' });
@@ -552,8 +588,19 @@ export const getReports = (): Promise<Report[]> => API_BASE === '/mock' ? mockAp
 export const submitReport = (reportData: any): Promise<void> => API_BASE === '/mock' ? mockApi.submitReport(reportData) : apiFetch<void>('/reports/index.php', { method: 'POST', body: JSON.stringify(reportData) });
 export const updateReportStatus = (reportId: string, status: Report['status']): Promise<void> => API_BASE === '/mock' ? mockApi.updateReportStatus(reportId, status) : apiFetch<void>(`/reports/status_update.php?id=${reportId}`, { method: 'PUT', body: JSON.stringify({ status }) });
 export const addReportReply = (reportId: string, reply: { reply: string }): Promise<void> => API_BASE === '/mock' ? mockApi.addReportReply(reportId, reply) : apiFetch<void>(`/reports/reply.php?id=${reportId}`, { method: 'POST', body: JSON.stringify(reply) });
-export const getVisibilitySettings = (): Promise<VisibilitySettings> => API_BASE === '/mock' ? mockApi.getVisibilitySettings() : apiFetch<VisibilitySettings>('/system/settings.php');
-export const updateVisibilitySettings = (settings: VisibilitySettings): Promise<void> => API_BASE === '/mock' ? mockApi.updateVisibilitySettings(settings) : apiFetch<void>('/system/settings.php', { method: 'PUT', body: JSON.stringify(settings) });
+export const getVisibilitySettings = async (): Promise<VisibilitySettings> => {
+    if (API_BASE === '/mock') return mockApi.getVisibilitySettings();
+    if (API_BASE === 'firebase') {
+        const snap = await getOnceFromFirebase('visibility');
+        return (snap as VisibilitySettings) || (await mockApi.getVisibilitySettings());
+    }
+    return apiFetch<VisibilitySettings>('/system/settings.php');
+};
+export const updateVisibilitySettings = async (settings: VisibilitySettings): Promise<void> => {
+    if (API_BASE === '/mock') return mockApi.updateVisibilitySettings(settings);
+    if (API_BASE === 'firebase') return writeToFirebaseData('visibility', settings);
+    return apiFetch<void>('/system/settings.php', { method: 'PUT', body: JSON.stringify(settings) });
+};
 export const pingServer = async (): Promise<boolean> => {
     if (API_BASE === '/mock') return Promise.resolve(true);
     try {
