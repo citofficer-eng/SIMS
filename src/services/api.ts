@@ -661,11 +661,92 @@ export const updateEventResults = async (eventId: string, results: EventResult[]
         const event = events[idx];
         event.results = results;
         event.status = EventStatus.COMPLETED;
-        // NOTE: complex score calculation may be required here; mimic mock behavior partially
+
+        // Compute raw scores per team
+        const computed = results.map(r => {
+            const raw = Object.values(r.criteriaScores || {}).reduce((s, v) => s + (Number(v) || 0), 0) + (Number(r.meritAdjustment) || 0) - (Number(r.demeritAdjustment) || 0);
+            return { teamId: r.teamId, rawScore: raw, result: r };
+        });
+        // Sort by rawScore desc
+        computed.sort((a, b) => b.rawScore - a.rawScore);
+
+        // Prepare placement points distribution based on event.competitionPoints
+        const cp = Number(event.competitionPoints) || 0;
+        const placementPoints = [cp, Math.round(cp * 0.66), Math.round(cp * 0.33), Math.round(cp * 0.1)];
+
+        // Read teams from DB (could be object map)
+        const teamsSnap = await getOnceFromFirebase('teams');
+        const teamsArr = (teamsSnap ? Object.values(teamsSnap) : []) as Team[];
+
+        // Build a map for easy lookup
+        const teamsById: { [id: string]: Team } = {};
+        teamsArr.forEach(t => teamsById[t.id] = { ...t });
+
+        // Apply placements and update team scores/eventScores
+        for (let i = 0; i < computed.length; i++) {
+            const item = computed[i];
+            const placement = i + 1;
+            const awardedPoints = placementPoints[i] || 0;
+            const team = teamsById[item.teamId];
+            if (!team) continue; // skip unknown teams
+
+            team.eventScores = team.eventScores || [];
+            const prev = team.eventScores.find(es => es.eventId === eventId) as any;
+            const prevPoints = prev ? (prev.competitionPoints || 0) : 0;
+
+            const scoresArray: { criteria: string; score: number; maxScore: number }[] = [];
+            // Build scores array from event.criteria
+            (event.criteria || []).forEach(c => {
+                const val = (item.result.criteriaScores && item.result.criteriaScores[c.name]) || 0;
+                scoresArray.push({ criteria: c.name, score: Number(val) || 0, maxScore: c.points || 0 });
+            });
+
+            const newEventScore: any = {
+                eventId: event.id,
+                eventName: event.name,
+                placement,
+                competitionPoints: awardedPoints,
+                rawScore: item.rawScore,
+                scores: scoresArray,
+                meritAdjustment: item.result.meritAdjustment || 0,
+                demeritAdjustment: item.result.demeritAdjustment || 0,
+                merits: item.result.merits || [],
+                demerits: item.result.demerits || []
+            };
+
+            // Replace or add
+            const idxEs = team.eventScores.findIndex(es => es.eventId === eventId);
+            if (idxEs > -1) team.eventScores[idxEs] = newEventScore; else team.eventScores.push(newEventScore);
+
+            // Update team score (remove prevPoints, add awardedPoints)
+            team.score = (team.score || 0) - prevPoints + awardedPoints;
+
+            // Update placementStats
+            team.placementStats = team.placementStats || { first: 0, second: 0, third: 0, fourth: 0, merits: 0, demerits: 0 };
+            if (placement === 1) team.placementStats.first = (team.placementStats.first || 0) + 1;
+            else if (placement === 2) team.placementStats.second = (team.placementStats.second || 0) + 1;
+            else if (placement === 3) team.placementStats.third = (team.placementStats.third || 0) + 1;
+            else if (placement === 4) team.placementStats.fourth = (team.placementStats.fourth || 0) + 1;
+
+            // Update progress history
+            team.progressHistory = team.progressHistory || [];
+            team.detailedProgressHistory = team.detailedProgressHistory || [];
+            const timestamp = new Date().toISOString();
+            const change = awardedPoints - prevPoints;
+            team.detailedProgressHistory.push({ timestamp, score: team.score, reason: `Event: ${event.name} (placement ${placement})`, change });
+            team.progressHistory.push({ date: timestamp, score: team.score });
+        }
+
+        // Write back teams as object map to preserve original structure
+        const teamsMap: any = {};
+        Object.values(teamsById).forEach((t: Team) => teamsMap[t.id] = t);
+        await writeToFirebaseData('teams', teamsMap).catch(e => console.warn('Firebase updateEventResults write teams failed', e));
+
+        // Persist events
         events[idx] = event;
         await writeToFirebaseData('events', events).catch(e => console.warn('Firebase updateEventResults failed', e));
         setStoredData(STORAGE_KEYS.EVENTS, events);
-        // Optionally update teams if logic present elsewhere
+        setStoredData(STORAGE_KEYS.TEAMS, Object.values(teamsMap));
         return event;
     }
     return apiFetch<Event>(`/events/results.php?id=${eventId}`, { method: 'PUT', body: JSON.stringify({ results }) });
