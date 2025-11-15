@@ -8,6 +8,7 @@ import { Team, Event, User } from '../types.ts';
 import { useSyncedData } from '../hooks/useSyncedData.ts';
 import { motion } from 'framer-motion';
 import ConnectionStatus from './ConnectionStatus';
+import DebugPanel from './DebugPanel';
 
 const HamburgerIcon: React.FC<{ isOpen: boolean }> = ({ isOpen }) => (
     <svg
@@ -184,6 +185,9 @@ const Header: React.FC<{ onToggleSidebar: () => void, sidebarOpen: boolean }> = 
                 <span className="font-semibold">{isLive ? 'Live Sync' : 'Real-time'}</span>
             </div>
             <ConnectionStatus />
+            <div className="ml-4">
+              <DebugPanel />
+            </div>
         </div>
 
         <div className="flex items-center gap-3">

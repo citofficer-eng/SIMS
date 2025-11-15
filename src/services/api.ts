@@ -65,6 +65,7 @@ const subscribeToFirebaseData = <T>(path: string, callback: (data: T) => void): 
         onValue(dbRef, (snapshot: any) => {
             if (snapshot.exists()) {
                 callback(snapshot.val());
+                try { lastReceivedTimestamps[path] = new Date().toISOString(); } catch (e) {}
             }
         });
         const unsubscribe = () => { try { off(dbRef); } catch (e) {} };
@@ -613,3 +614,7 @@ export const pingServer = async (): Promise<boolean> => {
 export const getRules = (): Promise<RulesData> => API_BASE === '/mock' ? mockApi.getRules() : apiFetch<RulesData>('/system/rules.php');
 export const updateRules = (rulesData: RulesData): Promise<void> => API_BASE === '/mock' ? mockApi.updateRules(rulesData) : apiFetch<void>('/system/rules.php', { method: 'PUT', body: JSON.stringify(rulesData) });
 export { STORAGE_KEYS, UserRole, subscribeToFirebaseData, writeToFirebaseData, firebaseListeners };
+
+// Track last-received timestamps per firebase path
+const lastReceivedTimestamps: { [path: string]: string } = {};
+export const getLastFirebaseTimestamps = () => ({ ...lastReceivedTimestamps });
