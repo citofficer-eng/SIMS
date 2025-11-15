@@ -596,6 +596,7 @@ export const getEvents = async (): Promise<Event[]> => {
         const events = (Object.values(snap) as Event[]).map(e => ({
             ...e,
             startDate: (e as any).startDate || (e as any).date || null,
+            date: (e as any).date || (e as any).startDate || null,
             status: (e as any).status || null,
         }));
         // Sort upcoming first by startDate (descending most recent first)
