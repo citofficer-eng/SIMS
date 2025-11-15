@@ -18,8 +18,14 @@ export function getApiBase(): string {
   console.log('[API] Is Firebase Hosting:', isFirebaseHosting);
   console.log('[API] Env VITE_API_BASE:', envApiBase);
   
-  // Priority: 1. Env file, 2. GitHub Pages/Firebase detection, 3. Default to backend
-  const result = envApiBase === '/mock' || (!envApiBase && (isGithubPages || isFirebaseHosting))
+  // Priority: 1. Env file (including 'firebase' mode), 2. GitHub Pages/Firebase detection, 3. Default to backend
+  // If env explicitly requests firebase, or we're on Firebase Hosting, use firebase mode
+  if (envApiBase === 'firebase' || (!envApiBase && isFirebaseHosting)) {
+    console.log('[API] Using Firebase mode');
+    return 'firebase';
+  }
+
+  const result = envApiBase === '/mock' || (!envApiBase && isGithubPages)
     ? '/mock'
     : (envApiBase || (typeof window !== 'undefined' ? window.location.origin + '/api' : '/api'));
   

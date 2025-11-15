@@ -36,8 +36,15 @@ const setStoredData = <T>(key: string, data: T) => {
 const getFirebaseDB = () => {
     try {
         const { initFirebase } = require('./firebase');
-        return initFirebase();
+        const db = initFirebase();
+        if (db) {
+            console.log('[Firebase] Database initialized successfully');
+        } else {
+            console.warn('[Firebase] Database initialization returned null');
+        }
+        return db;
     } catch (e) {
+        console.error('[Firebase] Failed to initialize database:', e);
         return null;
     }
 };
@@ -59,20 +66,30 @@ const getOnceFromFirebase = async <T>(path: string): Promise<T | null> => {
 const subscribeToFirebaseData = <T>(path: string, callback: (data: T) => void): (() => void) => {
     try {
         const db = getFirebaseDB();
-        if (!db) return () => {};
+        if (!db) {
+            console.error(`[Firebase] DB not initialized for subscription to ${path}`);
+            return () => {};
+        }
         const { ref, onValue, off } = require('firebase/database');
         const dbRef = ref(db, path);
+        console.log(`[Firebase] Subscribing to path: ${path}`);
         onValue(dbRef, (snapshot: any) => {
             if (snapshot.exists()) {
-                callback(snapshot.val());
+                const val = snapshot.val();
+                console.log(`[Firebase] Data received for ${path}:`, val);
+                callback(val);
                 try { lastReceivedTimestamps[path] = new Date().toISOString(); } catch (e) {}
+            } else {
+                console.warn(`[Firebase] No data exists at path: ${path}`);
             }
+        }, (error: any) => {
+            console.error(`[Firebase] Subscription error for ${path}:`, error);
         });
         const unsubscribe = () => { try { off(dbRef); } catch (e) {} };
         firebaseListeners.set(path, unsubscribe);
         return unsubscribe;
     } catch (e) {
-        console.warn('Firebase subscription failed for', path, e);
+        console.error(`[Firebase] Subscription failed for ${path}:`, e);
         return () => {};
     }
 };
@@ -444,7 +461,7 @@ const apiFetch = async <T,>(endpoint: string, options: RequestInit = {}): Promis
 // --- EXPORTED API FUNCTIONS ---
 export const login = async (email: string, pass: string): Promise<User> => {
     console.log('[API.login] API_BASE:', API_BASE);
-    if (API_BASE === '/mock') {
+    if (API_BASE === '/mock' || API_BASE === 'firebase') {
       console.log('[API.login] Using mock API');
       return mockApi.login(email, pass);
     }
@@ -465,17 +482,17 @@ export const login = async (email: string, pass: string): Promise<User> => {
     }
 };
 export const loginWithGoogle = async (googleData: { idToken: string }): Promise<{ user: User, isNew: boolean }> => {
-    if (API_BASE === '/mock') return mockApi.loginWithGoogle(googleData);
+    if (API_BASE === '/mock' || API_BASE === 'firebase') return mockApi.loginWithGoogle(googleData);
     const { user, token, isNew } = await apiFetch<{ token: string, user: User, isNew: boolean }>('/auth/google.php', { method: 'POST', body: JSON.stringify(googleData) });
     if (token) localStorage.setItem('token', token);
     return { user, isNew };
 };
 export const completeUserProfile = async (userData: User): Promise<User> => {
-    if (API_BASE === '/mock') return (await mockApi.completeUserProfile(userData)).user;
+    if (API_BASE === '/mock' || API_BASE === 'firebase') return (await mockApi.completeUserProfile(userData)).user;
     return (await apiFetch<{user: User}>('/auth/complete-profile.php', { method: 'PUT', body: JSON.stringify(userData) })).user;
 };
 export const register = async (userData: Partial<User>): Promise<User> => {
-    if (API_BASE === '/mock') return (await mockApi.register(userData)).user;
+    if (API_BASE === '/mock' || API_BASE === 'firebase') return (await mockApi.register(userData)).user;
     try {
       const { user, token } = await apiFetch<{ token: string, user: User }>('/auth/register.php', { method: 'POST', body: JSON.stringify(userData) });
       if (token) localStorage.setItem('token', token);
@@ -492,7 +509,7 @@ export const register = async (userData: Partial<User>): Promise<User> => {
     }
 };
 export const getCurrentUser = async (): Promise<User | null> => {
-    if (API_BASE === '/mock') {
+    if (API_BASE === '/mock' || API_BASE === 'firebase') {
         try {
             const stored = localStorage.getItem('user');
             if (!stored) return null;
@@ -539,7 +556,7 @@ export const getLeaderboard = async (): Promise<Team[]> => {
         () => mockApi.getLeaderboard()
     );
 };
-export const updateTeam = (teamData: Partial<Team>): Promise<Team> => API_BASE === '/mock' ? mockApi.updateTeam(teamData) : apiFetch<Team>(`/teams/update.php?id=${teamData.id}`, { method: 'PUT', body: JSON.stringify(teamData) });
+export const updateTeam = (teamData: Partial<Team>): Promise<Team> => API_BASE === '/mock' || API_BASE === 'firebase' ? mockApi.updateTeam(teamData) : apiFetch<Team>(`/teams/update.php?id=${teamData.id}`, { method: 'PUT', body: JSON.stringify(teamData) });
 export const getEvents = async (): Promise<Event[]> => {
     if (API_BASE === '/mock') return mockApi.getEvents();
     if (API_BASE === 'firebase') {
@@ -576,7 +593,7 @@ export const getAuditLogs = async (): Promise<Activity[]> => {
         return [];
     }
 };
-export const addPointLog = (log: { teamId: string, type: 'merit' | 'demerit', reason: string, points: number }): Promise<void> => API_BASE === '/mock' ? mockApi.addPointLog(log) : apiFetch<void>('/points/index.php', { method: 'POST', body: JSON.stringify(log) });
+export const addPointLog = (log: { teamId: string, type: 'merit' | 'demerit', reason: string, points: number }): Promise<void> => API_BASE === '/mock' || API_BASE === 'firebase' ? mockApi.addPointLog(log) : apiFetch<void>('/points/index.php', { method: 'POST', body: JSON.stringify(log) });
 export const deletePointLog = (logId: string): Promise<void> => API_BASE === '/mock' ? mockApi.deletePointLog(logId) : apiFetch<void>(`/points/delete.php?id=${logId}`, { method: 'DELETE' });
 export const updatePointLog = (logId: string, updatedLog: Partial<PointLog> & { teamId: string }): Promise<void> => API_BASE === '/mock' ? mockApi.updatePointLog(logId, updatedLog) : apiFetch<void>(`/points/update.php?id=${logId}`, { method: 'PUT', body: JSON.stringify({ team_id: updatedLog.teamId, reason: updatedLog.reason, points: updatedLog.points }) });
 export const getJoinRequests = (teamId: string): Promise<JoinRequest[]> => apiFetch<JoinRequest[]>(`/teams/join_requests.php?teamId=${teamId}`);
@@ -603,7 +620,7 @@ export const updateVisibilitySettings = async (settings: VisibilitySettings): Pr
     return apiFetch<void>('/system/settings.php', { method: 'PUT', body: JSON.stringify(settings) });
 };
 export const pingServer = async (): Promise<boolean> => {
-    if (API_BASE === '/mock') return Promise.resolve(true);
+    if (API_BASE === '/mock' || API_BASE === 'firebase') return Promise.resolve(true);
     try {
         await apiFetch<void>('/system/ping.php');
         return true;

@@ -1,0 +1,38 @@
+{
+  "users": {
+    "admin_1": {
+      "id": "admin_1",
+      "name": "Benlor Rivera",
+      "email": "riverabenlor461@gmail.com",
+      "role": "ADMIN",
+      "avatar": "https://i.pravatar.cc/150?u=admin_1",
+      "firstName": "Benlor",
+      "lastName": "Rivera",
+      "studentId": "ADMIN-BEN",
+      "teamId": "t5",
+      "lastActive": "2025-11-15T00:00:00.000Z"
+    }
+  },
+  "teams": {
+    "t1": { "rank": 1, "id": "t1", "name": "Midnight Spades", "score": 120, "playersCount": 10, "progressHistory": [{"score":0},{"score":120}] },
+    "t2": { "rank": 2, "id": "t2", "name": "Scarlet Hearts", "score": 95, "playersCount": 9, "progressHistory": [{"score":0},{"score":95}] },
+    "t3": { "rank": 3, "id": "t3", "name": "Emerald Clovers", "score": 80, "playersCount": 8, "progressHistory": [{"score":0},{"score":80}] },
+    "t4": { "rank": 4, "id": "t4", "name": "Glacier Diamonds", "score": 60, "playersCount": 7, "progressHistory": [{"score":0},{"score":60}] },
+    "t5": { "rank": 5, "id": "t5", "name": "Amaranth Jokers", "score": 0, "playersCount": 5, "progressHistory": [{"score":0}] }
+  },
+  "events": {
+    "jf1": { "id": "jf1", "name": "Joker Flag Wave 1: Chant", "date": "2025-11-16T00:00:00.000Z", "status": "UPCOMING", "competitionPoints": 1000 },
+    "cit1": { "id": "cit1", "name": "Cheer Dance", "date": "2025-11-16T00:00:00.000Z", "status": "UPCOMING", "competitionPoints": 1500 }
+  },
+  "notifications": [
+    { "id": "notif1", "title": "Scores Updated!", "message": "Results for \"Hackathon\" are in! Check the leaderboard.", "link": "/leaderboard", "timestamp": "2025-11-15T00:00:00.000Z", "type": "success" }
+  ],
+  "visibility": {
+    "competitionScores": true,
+    "pages": { "dashboard": true, "leaderboard": true, "teams": true, "events": true }
+  },
+  "rules": {
+    "mainTitle": "i3 Day | Clash of Cards",
+    "sections": [ { "id": "objectives", "title": "Objectives", "items": [{"type":"list","items":["Showcase diverse talents","Promote sportsmanship"]}] } ]
+  }
+}

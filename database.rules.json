@@ -1,0 +1,35 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": false,
+    "users": {
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      "$uid": {
+        ".read": true
+      }
+    },
+    "teams": {
+      ".read": true,
+      "$teamId": {
+        ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || root.child('users').child(auth.uid).child('role').val() === 'OFFICER'"
+      }
+    },
+    "events": {
+      ".read": true,
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+    },
+    "notifications": {
+      ".read": true,
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+    },
+    "visibility": {
+      ".read": true,
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+    },
+    "rules": {
+      ".read": true,
+      ".write": "root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+    }
+  }
+}
+
