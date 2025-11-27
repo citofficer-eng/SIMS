@@ -74,7 +74,8 @@ const SingleTeamChart: React.FC<{ team: Team, color: string }> = ({ team, color 
         );
     };
     
-    const hasMeaningfulData = (team.detailedProgressHistory?.length ?? 0) > 1;
+    const raw = team.detailedProgressHistory || [];
+    const hasMeaningfulData = raw.length > 0;
 
     if (!hasMeaningfulData) {
         return (
@@ -86,18 +87,30 @@ const SingleTeamChart: React.FC<{ team: Team, color: string }> = ({ team, color 
             </div>
         )
     }
+    // Normalize data: ensure every point has score, timestamp, reason, change
+    const normalized: any[] = raw.map((item: any, i: number) => ({
+        score: typeof item.score === 'number' ? item.score : (item.score ? Number(item.score) : 0),
+        timestamp: item.timestamp || item.date || new Date().toISOString(),
+        reason: item.reason || (i === 0 ? 'Initial score' : 'Update'),
+        change: typeof item.change === 'number' ? item.change : 0,
+    }));
+    // If change values are missing, compute them from score deltas
+    for (let i = normalized.length - 1; i > 0; i--) {
+        if (!normalized[i].change) normalized[i].change = normalized[i].score - normalized[i-1].score;
+    }
+    if (normalized.length === 1 && normalized[0].change === 0) normalized[0].change = 0;
 
-    const ticks = team.detailedProgressHistory ? team.detailedProgressHistory.map((_, i) => i).filter(i => i % Math.ceil((team.detailedProgressHistory?.length || 1) / 5) === 0 || i === (team.detailedProgressHistory?.length || 0) -1) : [];
+    const ticks = normalized.map((_, i) => i).filter(i => i % Math.ceil((normalized.length || 1) / 5) === 0 || i === (normalized.length || 0) -1);
 
     return (
         <div className="h-48 cursor-pointer" onClick={handleChartClick} title="Click to view score log">
             <h4 className="font-bold text-sm mb-2" style={{ color }}>{team.name}</h4>
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={team.detailedProgressHistory || []} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                <LineChart data={normalized} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" strokeOpacity={theme === 'dark' ? 0.1 : 0.3} />
                     <XAxis 
                         tick={{fontSize: 10, fill: tickColor}} 
-                        tickFormatter={(index) => `Update ${index}`}
+                        tickFormatter={(index) => `#${index+1}`}
                         interval={0}
                         angle={-30}
                         textAnchor="end"

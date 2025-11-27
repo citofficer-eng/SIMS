@@ -25,6 +25,9 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
+          // Prefer ESM builds for generated dataconnect package to avoid bundling CommonJS require()
+          '@dataconnect/generated': path.resolve(__dirname, 'src/dataconnect-generated/esm/index.esm.js'),
+          '@dataconnect/generated/react': path.resolve(__dirname, 'src/dataconnect-generated/react/esm/index.esm.js'),
         }
       }
     };
